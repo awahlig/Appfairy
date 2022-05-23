@@ -31,6 +31,11 @@ const flattenChildren = (children = [], flatten = []) => {
   return flatten
 }
 
+const dotRelative = (fromPath, toPath) => {
+  let result = path.relative(fromPath, toPath)
+  return result.startsWith('.') ? result : `./${result}`
+}
+
 @Internal(_)
 class ViewWriter extends Writer {
   static async writeAll(viewWriters, dir, ctrlsDir) {
@@ -39,17 +44,17 @@ class ViewWriter extends Writer {
     const indexFilePath = `${dir}/index.js`
     const helpersFilePath = `${dir}/helpers.js`
     const childFilePaths = [indexFilePath, helpersFilePath]
-    ctrlsDir = path.relative(dir, ctrlsDir)
-    viewWriters = flattenChildren(viewWriters)
 
     const writingViews = viewWriters.map(async (viewWriter) => {
       const filePaths = await viewWriter.write(dir, ctrlsDir)
       childFilePaths.push(...filePaths)
     })
 
-    const index = viewWriters.map((viewWriter) => {
-      return `export { default as ${viewWriter.className} } from './${viewWriter.className}'`
-    }).join('\n')
+    const index = flattenChildren(viewWriters
+      .filter((viewWriter) => viewWriter.folder == '.'))
+        .map((viewWriter) => (
+          `export { default as ${viewWriter.className} } from './${viewWriter.className}'`
+        )).join('\n')
 
     const writingIndex = fs.writeFile(indexFilePath, freeLint(index))
     const writingHelpers = fs.writeFile(helpersFilePath, raw.viewHelpers)
@@ -61,6 +66,14 @@ class ViewWriter extends Writer {
     ])
 
     return childFilePaths
+  }
+
+  get folder() {
+    return this[_].folder
+  }
+
+  set folder(folder) {
+    this[_].folder = String(folder)
   }
 
   get baseUrl() {
@@ -169,6 +182,7 @@ class ViewWriter extends Writer {
       const child = new ViewWriter({
         name: elName,
         html: $.html($el),
+        folder: this.folder,
         baseUrl: this.baseUrl,
         styles: this.styles,
       })
@@ -297,10 +311,11 @@ class ViewWriter extends Writer {
     this.name = options.name
     this.html = options.html
     this.source = options.source
+    this.folder = options.folder
   }
 
   async write(dir, ctrlsDir) {
-    const filePath = `${dir}/${this.className}.js`
+    const filePath = path.normalize(`${dir}/${this.folder}/${this.className}.js`)
     const childFilePaths = [filePath]
 
     const writingChildren = this[_].children.map(async (child) => {
@@ -308,11 +323,14 @@ class ViewWriter extends Writer {
       childFilePaths.push(...filePaths)
     })
 
-    const writingSelf = fs.writeFile(`${dir}/${this.className}.js`, this[_].compose(ctrlsDir))
+    const writeSelf = async () => {
+      await fs.mkdir(path.dirname(filePath), { recursive: true })
+      await fs.writeFile(filePath, this[_].compose(dir, ctrlsDir))
+    }
 
     await Promise.all([
       ...writingChildren,
-      writingSelf,
+      writeSelf(),
     ])
 
     return childFilePaths
@@ -340,10 +358,15 @@ class ViewWriter extends Writer {
     }
   }
 
-  _compose(ctrlsDir) {
+  _compose(dir, ctrlsDir) {
+    const helpersPath = dotRelative(this.folder, 'helpers')
+    const ctrlPath = dotRelative(
+      `${dir}/${this.folder}`,
+      `${ctrlsDir}/${this.folder}/${this.ctrlClassName}`,
+    )
     return freeLint(`
       import React from 'react'
-      import { createScope, map, transformProxies } from './helpers'
+      import { createScope, map, transformProxies } from '${helpersPath}'
       ==>${this[_].composeChildImports()}<==
       const scripts = [
         ==>${this[_].composeScriptsDeclerations()}<==
@@ -356,7 +379,7 @@ class ViewWriter extends Writer {
           if (Controller) return Controller
 
           try {
-            Controller = require('${ctrlsDir}/${this.ctrlClassName}')
+            Controller = require('${ctrlPath}')
             Controller = Controller.default || Controller
 
             return Controller

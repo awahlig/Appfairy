@@ -10,16 +10,17 @@ export const transpile = async (config) => {
   let outputFiles = []
 
   await Promise.all([
-    fs.readdir(config.input).then((files) => {
-      inputFiles = files
+    reread(config.input).then((files) => {
+      inputFiles = files.map((file) => path.relative(config.input, file))
     }),
     git.removeAppfairyFiles().then((files) => {
       outputFiles.push(...files)
     }),
   ])
 
-  const htmlFiles = inputFiles.filter(file => path.extname(file) == '.html')
-  const publicSubDirs = inputFiles.filter(file => !path.extname(file))
+  const isHTML = (file) => path.extname(file) == '.html'
+  const htmlFiles = inputFiles.filter(isHTML)
+  const publicFiles = inputFiles.filter(file => !isHTML(file))
 
   const scriptWriter = new ScriptWriter({
     baseUrl: config.input,
@@ -57,7 +58,7 @@ export const transpile = async (config) => {
 
   const makingPublicDir = makePublicDir(
     config,
-    publicSubDirs,
+    publicFiles,
   ).then((paths) => outputFiles.push(...paths))
 
   await Promise.all([
@@ -83,7 +84,8 @@ const transpileHTMLFile = async (
   const dataAttrs = $(':root').data()
 
   const viewWriter = new ViewWriter({
-    name: htmlFile.split('.').slice(0, -1).join('.'),
+    folder: path.dirname(htmlFile),
+    name: path.basename(htmlFile).split('.').slice(0, -1).join('.'),
     baseUrl: config.baseUrl,
     source: config.source,
   })
@@ -96,13 +98,13 @@ const transpileHTMLFile = async (
   return viewWriter
 }
 
-const makePublicDir = async (config, publicSubDirs) => {
+const makePublicDir = async (config, publicFiles) => {
   const publicDir = config.output.public
 
-  await Promise.all(publicSubDirs.map((publicSubDir) => {
+  await Promise.all(publicFiles.map((publicFile) => {
     return ncp(
-      `${config.input}/${publicSubDir}`,
-      `${publicDir}/${publicSubDir}`,
+      `${config.input}/${publicFile}`,
+      `${publicDir}/${publicFile}`,
     )
   }))
 
