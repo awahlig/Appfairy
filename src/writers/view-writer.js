@@ -483,7 +483,9 @@ class ViewWriter extends Writer {
   }
 
   _composeScriptsInvocations() {
-    if (!this[_].scripts) return ''
+    if (this[_].scripts.length == 0) {
+      return ''
+    }
 
     const invoke = freeScope('eval(arguments[0])', 'window', {
       'script': null,
