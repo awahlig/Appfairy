@@ -185,7 +185,6 @@ class ViewWriter extends Writer {
         html: $.html($el),
         folder: this.folder,
         baseUrl: this.baseUrl,
-        styles: this.styles,
       })
 
       children.push(child)
@@ -407,9 +406,7 @@ class ViewWriter extends Writer {
 
           return (
             <span>
-              <style dangerouslySetInnerHTML={{ __html: \`
-                ==>${this[_].composeStyleImports()}<==
-              \` }} />
+              ==>${this[_].composeStyleImports()}<==
               ==>${this.jsx}<==
             </span>
           )
@@ -441,7 +438,16 @@ class ViewWriter extends Writer {
       return sheet
     }).join('\n\n')
 
-    return escape(css.trim())
+    const imports = escape(css.trim())
+    if (!imports) {
+      return ''
+    }
+
+    return freeText(`
+      <style dangerouslySetInnerHTML={{ __html: \`
+        ==>${imports}<==
+      \` }} />
+    `)
   }
 
   _composeChildImports() {
