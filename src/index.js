@@ -91,7 +91,9 @@ const transpileHTMLFile = async (
   })
 
   setScripts(scriptWriter, $head, $)
-  setStyles(viewWriter, styleWriter, $head, $)
+  if (config.importStyles) {
+    setStyles(viewWriter, styleWriter, $head, $)
+  }
   setHTML(viewWriter, $body, $)
   setWfData(viewWriter, dataAttrs)
 

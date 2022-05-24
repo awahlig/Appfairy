@@ -92,6 +92,9 @@ the root of the project. The config file may (or may not) include some of the fo
 
     - **views (string)** - Scripts dir. Defaults to \`src/views\`.
 
+- **importStyles (boolean)** - If set to false, styles won't be imported when view components are mounted.
+  Instead, they should be added manually to <head> in client/index.html.
+
 Alternatively, you may provide (extra) options through the command line like the following:
 
     $ appfairy [...options]
@@ -137,6 +140,7 @@ const configBase = {
   output,
   source,
   prefetch,
+  importStyles: true,
   // Preserve original path
   __dirname: path.dirname(config || root),
 }
@@ -196,6 +200,9 @@ if (typeof config.output.src.controllers != 'string') {
 }
 if (typeof config.source != 'string') {
   throw TypeError('config.source must be a string')
+}
+if (typeof config.importStyles != 'boolean') {
+  throw TypeError('config.importStyles must be a boolean')
 }
 
 config.input = path.resolve(config.__dirname, config.input)
