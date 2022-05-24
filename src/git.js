@@ -8,11 +8,11 @@ export const add = async (files) => {
     'rev-parse', '--show-toplevel'
   ])
 
-  files = files.map((file) => path.resolve(root, file))
+  files = files.map((file) => path.resolve('.', file))
 
   let unstaged = await Promise.all([
     execa('git', ['diff', '--name-only']),
-    execa('git', ['ls-files', '--others', '--exclude-standard']),
+    execa('git', ['ls-files', '--others', '--exclude-standard', '--full-name']),
   ]).then((results) => {
     return results.reduce((unstaged, { stdout }) => {
       return unstaged.concat(stdout.split('\n').filter(Boolean))
@@ -74,8 +74,10 @@ export const removeAppfairyFiles = async () => {
     'rev-parse', '--show-toplevel'
   ])
 
+  files = files.map((file) => path.resolve(root, file))
+
   await Promise.all(files.map(async (file) => {
-    return fs.unlink(`${root}/${file}`)
+    return fs.unlink(file)
   }))
 
   return files
