@@ -1,3 +1,17 @@
+Changes made in this fork:
+
+- Support for page folders (namespaces for pages)
+- Support for multiple sockets with the same name (single proxy referring to multiple elements in the view)
+- Support for multiple child views with the same name (only last one is used)
+- Don't encapsulate normalize.css (changes specificity of selectors which needs to stay low)
+- Bugfix: wrong paths in git integration when root folder not git top-level directory
+
+This version is published in the `@awahlig` namespace and can be installed using:
+
+    $ npm install @awahlig/appfairy -g
+
+Original README.md:
+
 # Appfairy
 
 <p align="center"><img src="https://user-images.githubusercontent.com/7648874/45173702-8e98e700-b23b-11e8-96c7-2426ab03abe0.png" alt="appfairy"></p>
