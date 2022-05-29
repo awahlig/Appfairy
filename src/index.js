@@ -43,6 +43,7 @@ export const transpile = async (config) => {
   })
 
   const writingFiles = Promise.all(transpilingHTMLFiles).then((viewWriters) => {
+    ViewWriter.removeDupChildren(viewWriters)
     return Promise.all([
       ViewWriter.writeAll(
         viewWriters, config.output.src.views, config.output.src.controllers

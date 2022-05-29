@@ -52,7 +52,7 @@ class ViewWriter extends Writer {
 
     const index = flattenChildren(viewWriters
       .filter((viewWriter) => viewWriter.folder == '.'))
-        .sort((a, b) => a.className < b.className ? -1 : 1)
+        .sort(ViewWriter.compare)
         .map((viewWriter) => (
           `export { default as ${viewWriter.className} } from './${viewWriter.className}'`
         )).join('\n')
@@ -67,6 +67,19 @@ class ViewWriter extends Writer {
     ])
 
     return childFilePaths
+  }
+
+  static removeDupChildren(viewWriters) {
+    const dups = new Set()
+    viewWriters.sort(ViewWriter.compare).forEach((viewWriter) => {
+      viewWriter.removeDupChildren(dups)
+    })
+  }
+
+  static compare(writerA, writerB) {
+    const a = writerA.key
+    const b = writerB.key
+    return (a < b) ? -1 : (a > b) ? 1 : 0
   }
 
   get folder() {
@@ -118,6 +131,10 @@ class ViewWriter extends Writer {
 
   get elName() {
     return this[_].elName
+  }
+
+  get key() {
+    return `${this.folder}/${this.className}`
   }
 
   set html(html) {
@@ -313,6 +330,20 @@ class ViewWriter extends Writer {
     this.source = options.source
     this.folder = options.folder
     this.importStyles = options.importStyles
+  }
+
+  removeDupChildren(dups) {
+    this[_].children = this[_].children.filter((child) => {
+      const key = child.key
+      if (!dups.has(key)) {
+        dups.add(key)
+        return true
+      }
+      return false // dup found, skip it
+    })
+    this[_].children.forEach((child) => {
+      child.removeDupChildren(dups)
+    })
   }
 
   async write(dir, ctrlsDir) {
