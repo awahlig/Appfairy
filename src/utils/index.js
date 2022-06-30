@@ -152,7 +152,7 @@ export const padLeft = (str, length, char = ' ') => {
 
 // css/webflow.css -> /css/webflow.css
 export const absoluteHref = (href) => {
-  if (!href || href.startsWith('/')) {
+  if (!href || href.startsWith('/') || href.startswith('#')) {
     // already absolute
     return href
   }
