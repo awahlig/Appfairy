@@ -183,6 +183,16 @@ class ViewWriter extends Writer {
 
         $el.attr('class', className)
       }
+
+      let href = $el.attr('href')
+      if (href) {
+        $el.attr('href', absoluteHref(href));
+      }
+
+      let src = $el.attr('src')
+      if (src) {
+        $el.attr('src', absoluteHref(src));
+      }
     })
 
     let el = $('[af-el]')[0]
