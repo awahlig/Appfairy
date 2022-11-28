@@ -28,19 +28,13 @@ export const transpile = async (config) => {
 
     // Remove remaining empty directories
     const dirs = [...new Set(migration.generatedFiles
-      .map((file) => {
-        // Collect all parents (a/b/c, a/b, a)
-        const result = []
-        for (;;) {
-          file = path.dirname(file)
-          if (file == '.') {
-            return result
-          }
-          result.push(file)
-        }
-      })
+      .map((file) => (
+        // Collect all parents a/b/c/d => [a, a/b, a/b/c]
+        [...file.matchAll(/\//g)].map(match => file.slice(0, match.index))
+      ))
       .flat())] // flatten and find unique
       .sort().reverse() // root dirs last
+    // Try to remove all directories, ignoring errors if not empty
     for (let dir of dirs) {
       dir = path.join(path.dirname(config.output.migration), dir)
       await fs.rmdir(dir).catch(() => {})
