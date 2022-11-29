@@ -41,19 +41,27 @@ const transformProxies = (children = []) => {
   const proxies = {}
 
   React.Children.forEach(children, (child) => {
-    const props = Object.assign({}, child.props)
+    const { 'af-sock': sock, ...props } = child.props
 
-    Object.defineProperties(props, {
-      _used: { value: false, writable: true },
-      _type: { value: child.type, writable: false },
-    })
-
-    const name = (props['af-sock'] || '').trim().replace(/_/g, '-')
+    const name = (sock || '').trim().replace(/_/g, '-')
     if (!name) {
       throw new ProxyError(`: missing af-sock= on <${child.type}>`)
     }
-    delete props['af-sock']
-    
+
+    Object.defineProperties(props, {
+      _name: { value: name, writable: false },
+      _type: { value: child.type, writable: false },
+      _used: { value: false, writable: true },
+    })
+
+    if (child.key != null) {
+      props.key = child.key
+    }
+
+    if (child.ref != null) {
+      props.ref = child.ref
+    }
+
     if (!proxies[name]) {
       proxies[name] = props
     }
@@ -62,14 +70,6 @@ const transformProxies = (children = []) => {
     }
     else {
       proxies[name].push(props)
-    }
-
-    if (child.key != null) {
-      props.key = child.key
-    }
-
-    if (child.ref != null) {
-      props.ref = child.ref
     }
   })
 
