@@ -45,7 +45,8 @@ const transformProxies = (children = []) => {
 
     const name = (sock || '').trim().replace(/_/g, '-')
     if (!name) {
-      throw new ProxyError(`: missing af-sock= on <${child.type}>`)
+      const tag = child.type.name || child.type
+      throw new ProxyError(`: missing af-sock= on <${tag}>`)
     }
 
     Object.defineProperties(props, {
