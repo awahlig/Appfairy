@@ -1,24 +1,34 @@
 import React from 'react'
 import { loadScripts } from '../scripts/helpers'
 
-class ProxyError extends Error {
+export class ProxyError extends Error {
   constructor(message) {
     super(message)
     this.name = 'ProxyError'
   }
 }
 
-export class View extends React.Component {
-  componentDidMount() {
-    const scripts = this.constructor.scripts
+export const useScripts = (scripts) => {
+  React.useEffect(() => {
     if (scripts) {
       loadScripts(scripts).then(ix2init)
     }
-  }
+  }, [scripts])
+}
 
-  componentDidUpdate() {
-    ix2init()
-  }
+/**
+ * Use when dynamically adding elements for which IX2 interactions have
+ * been defined in Webflow. It forces IX2 to rescan the page and attach
+ * event handlers to the new elements. Argument is a dependencies array
+ * used to determine when a rescan is necessary, similar to useEffect().
+ */
+export const useIX2 = (deps) => {
+  const ref = React.useRef(false)
+  React.useEffect(() => {
+    if (ref.current) ix2init()
+    else ref.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
 }
 
 export const ix2init = () => {

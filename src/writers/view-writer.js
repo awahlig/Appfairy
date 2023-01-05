@@ -368,7 +368,7 @@ class ViewWriter extends Writer {
     // Transforming HTML into JSX
     let jsx = htmltojsx.convert(html).trim()
     // Bind sockets and child views
-    this[_].jsx = bindJSX(jsx)
+    this[_].jsx = bindJSX(jsx, this.classPath)
   }
 
   set wfData(dataAttrs) {
@@ -459,13 +459,14 @@ class ViewWriter extends Writer {
 
   _compose() {
     return freeLint(`
-      import { View, createScope } from '${this[_].importPath('./helpers')}'
+      import { useEffect } from 'react'
+      import { useScripts, createScope } from '${this[_].importPath('./helpers')}'
 
       /*
         ==>${this[_].composeViewArray().join('\n')}<==
       */
 
-      ==>${this[_].composeViews('export')}<==
+      ==>${this[_].composeViews('export const ')}<==
 
       export const sock = ${this.className}.sock
       export default ${this.className}
@@ -479,33 +480,48 @@ class ViewWriter extends Writer {
     ]
   }
 
-  _composeViews(prefix) {
-    let children = this[_].children.map(child => {
-      return child[_].composeViews(`static ${child[_].className} =`)
-    })
-    if (children.length > 0) children.unshift('')
+  _composeViews(prefix = '') {
+    const classPath = this.classPath
 
-    const props = [
-      this[_].composeDocstringAndSocks(),
-      this[_].composeScriptsDeclerations(),
-      this[_].composeComponentDidMount(),
-    ].filter(Boolean)
-
-    const render = [
+    const jsx = [
       this[_].composeStyleImports(),
       this.jsx,
     ].filter(Boolean)
 
-    return freeText(`
-      ${prefix} class ${this.className} extends View {
-        ==>${props.join('\n\n')}<==
+    const render = freeText(`
+      return createScope(props.children, proxy => <>
+        ==>${jsx.join('\n')}<==
+      </>)
+    `)
 
-        render() {
-          return createScope(this.props.children, proxy => <>
-            ==>${render.join('\n')}<==
-          </>)
-        ==>${'}' + children.join('\n\n')}<==
+    const [docstring, socks] = this[_].composeDocstringAndSocks()
+    const [scriptsHook, scripts] = this[_].composeScriptsDeclerations()
+
+    const body = [
+      scriptsHook,
+      this[_].composeEffects(),
+      render,
+    ].filter(Boolean)
+
+    const decl = [
+      `${classPath}.sock = Object.freeze({${socks}})`,
+      scripts,
+      ...this[_].children.map(child => {
+        return child[_].composeViews()
+      }),
+    ].filter(Boolean)
+
+    return freeText(`
+      /**
+        ${classPath}
+        ${'-'.repeat(classPath.length)}
+        ==>${docstring}<==
+      */
+      ${prefix}${classPath} = (props) => {
+        ==>${body.join('\n\n')}<==
       }
+
+      ==>${decl.join('\n\n')}<==
     `)
   }
 
@@ -543,15 +559,8 @@ class ViewWriter extends Writer {
   }
 
   _composeDocstringAndSocks() {
-    const classPath = this.classPath
     if (Object.keys(this[_].sockets).length === 0) {
-      return freeText(`
-        /*
-          ${classPath}
-          ${'='.repeat(classPath.length)}
-        */
-        static sock = Object.freeze({})
-      `)
+      return ['', '']
     }
 
     const sock = {}
@@ -571,27 +580,16 @@ class ViewWriter extends Writer {
         return `\n${text}\n`
       }).join('\n')
 
-    const hintText = freeText(`
-      ${classPath}
-      ${'='.repeat(classPath.length)}
+    const hints = collectHints(this[_].sockets).trim().replace(/\n\n\n/g, '\n\n')
+    const docstring = `\`\`\`\n${hints}\n\`\`\``
 
-      ==>${collectHints(this[_].sockets)}<==
-    `).replace(/\n\n\n/g, '\n\n')
+    const sockString = Object.entries(sock).sort().map(([ident, name]) =>
+      `\n  ${ident}: '${name}',`).join('')
 
-    const sockText = Object.entries(sock).sort().map(([ident, name]) =>
-      `${ident}: '${name}',`).join('\n')
-
-    return freeText(`
-      /*
-        ==>${hintText}<==
-      */
-      static sock = Object.freeze({
-        ==>${sockText}<==
-      })
-    `)
+    return [docstring, sockString + '\n']
   }
 
-  _composeComponentDidMount() {
+  _composeEffects() {
     const content = [
       this[_].composeWfDataAttrs(),
     ].filter(Boolean)
@@ -599,11 +597,9 @@ class ViewWriter extends Writer {
     if (content.length === 0) return ''
 
     return freeText(`
-      componentDidMount() {
+      useEffect(() => {
         ==>${content.join('\n\n')}<==
-
-        super.componentDidMount()
-      }
+      }, [])
     `)
   }
 
@@ -625,13 +621,17 @@ class ViewWriter extends Writer {
       return `{ ${text} },`
     })
 
-    if (content.length === 0) return ''
+    if (content.length === 0) return ['', '']
 
-    return freeText(`
-      static scripts = Object.freeze([
+    const classPath = this.classPath
+    const hook = `useScripts(${classPath}.scripts)`
+    const decl = freeText(`
+      ${classPath}.scripts = Object.freeze([
         ==>${content.join('\n')}<==
       ])
     `)
+
+    return [hook, decl]
   }
 
   _composeWfDataAttrs() {
@@ -656,7 +656,7 @@ class ViewWriter extends Writer {
   }
 }
 
-function bindJSX(jsx) {
+function bindJSX(jsx, classPath) {
   const decode = encoded => JSON.parse(base32.decode(encoded))
   
   // ORDER MATTERS
@@ -669,7 +669,7 @@ function bindJSX(jsx) {
       const { sock, repeat } = decode(encoded)
       // If there are nested sockets
       return /<[\w._-]+-af-sock-\d+-\w+/.test(content) ? (
-        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content)}</>)}</T>)}`
+        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content, classPath)}</>)}</T>)}`
       ) : (
         `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children ? props.children : <>${content}</>}</T>)}`
       )
@@ -683,7 +683,7 @@ function bindJSX(jsx) {
       // Handle sockets for child views
       if (el.startsWith('af-view-')) {
         el = decode(el.slice(8)).name
-        return `{proxy('${sock}', '${repeat}', (props, T=this.constructor.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>)}`
+        return `{proxy('${sock}', '${repeat}', (props, T=${classPath}.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>)}`
       }
       return `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children}</T>)}`
     })
@@ -692,7 +692,7 @@ function bindJSX(jsx) {
       /<af-view-(\w+)(.*?)\/>/g, (
       _match, encoded
     ) => {
-      return `<this.constructor.${decode(encoded).name}/>`
+      return `<${classPath}.${decode(encoded).name}/>`
     })
   }
 
