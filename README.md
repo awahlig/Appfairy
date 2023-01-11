@@ -5,6 +5,7 @@ Changes made in this fork:
 - Support for the `af-repeat` attribute ([more](https://github.com/awahlig/Appfairy/commit/010b0409fe644c23889256c18cde1127818f2f1e))
 - Support for page folders (namespaces for pages) ([more](https://github.com/awahlig/Appfairy/commit/56bfc9ba12d69506fff33c954e35d0bd0fe7805c))
 - Support for multiple sockets with the same name (single proxy referring to multiple elements in the view)
+- Views are function components instead of classes
 - Redesigned child-views with namespaces and reusable controllers
 - Encapsulation of CSS disabled by default
 - Bugfixes
