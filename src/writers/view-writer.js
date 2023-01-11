@@ -49,12 +49,12 @@ class ViewWriter extends Writer {
       Object.entries(folders).map(async ([folder, viewWriters]) => {
         const index = viewWriters
           .sort((writerA, writerB) => {
-            const a = writerA.className
-            const b = writerB.className
+            const a = writerA.viewName
+            const b = writerB.viewName
             return (a < b) ? -1 : (a > b) ? 1 : 0
           })
           .map((viewWriter) => (
-            `export { ${viewWriter.className} } from './${viewWriter.className}'`
+            `export { ${viewWriter.viewName} } from './${viewWriter.viewName}'`
           )).join('\n')
 
         const indexFilePath = `${dir}/${folder}/index.js`
@@ -122,7 +122,7 @@ class ViewWriter extends Writer {
     const words = splitWords(name)
 
     Object.assign(this[_], {
-      className: words.concat('view').map(upperFirst).join(''),
+      viewName: words.concat('view').map(upperFirst).join(''),
       name: words.map(word => word.toLowerCase()).join('-'),
     })
   }
@@ -131,16 +131,16 @@ class ViewWriter extends Writer {
     return this[_].name
   }
 
-  get className() {
-    return this[_].className
+  get viewName() {
+    return this[_].viewName
   }
 
-  get classPath() {
-    const classNames = []
+  get viewPath() {
+    const viewNames = []
     for (let writer = this; writer; writer = writer.parent) {
-      classNames.push(writer.className)
+      viewNames.push(writer.viewName)
     }
-    return classNames.reverse().join('.')
+    return viewNames.reverse().join('.')
   }
 
   set html(html) {
@@ -233,11 +233,11 @@ class ViewWriter extends Writer {
         parent: this,
       })
 
-      if (children.find(viewWriter => viewWriter.className === child.className)) {
-        throw `error: view ${child.classPath} already exists`
+      if (children.find(viewWriter => viewWriter.viewName === child.viewName)) {
+        throw `error: view ${child.viewPath} already exists`
       }
 
-      const data = { name: child.className }
+      const data = { name: child.viewName }
       const encoded = base32.encode(JSON.stringify(data))
       $view[0].name = `af-view-${encoded}` // replace "div"
 
@@ -316,14 +316,14 @@ class ViewWriter extends Writer {
 
       if (!/^[a-z_-][0-9a-z_-]*$/.test(sock)) {
         const ns = getSockNamespace($el).join('.')
-        throw `error: invalid af-sock='${sock}' under '${ns}' in view ${this.classPath}`
+        throw `error: invalid af-sock='${sock}' under '${ns}' in view ${this.viewPath}`
       }
 
       const normSock = sock.replace(/_/g, '-')
 
       if (!/^[?*+!]?$/.test(repeat)) {
         const sockPath = getSockNamespace($el).concat(normSock).join('.')
-        throw `error: invalid af-repeat='${repeat}' for socket '${sockPath}' in view ${this.classPath}`
+        throw `error: invalid af-repeat='${repeat}' for socket '${sockPath}' in view ${this.viewPath}`
       }
 
       $el.attr('af-sock', normSock)
@@ -368,7 +368,7 @@ class ViewWriter extends Writer {
     // Transforming HTML into JSX
     let jsx = htmltojsx.convert(html).trim()
     // Bind sockets and child views
-    this[_].jsx = bindJSX(jsx, this.classPath)
+    this[_].jsx = bindJSX(jsx, this.viewPath)
   }
 
   set wfData(dataAttrs) {
@@ -429,7 +429,7 @@ class ViewWriter extends Writer {
   }
 
   async write(dir) {
-    const filePath = path.normalize(`${dir}/${this.folder}/${this.className}.js`)
+    const filePath = path.normalize(`${dir}/${this.folder}/${this.viewName}.js`)
     await mkdirp(path.dirname(filePath))
     await fs.writeFile(filePath, this[_].compose())
     return filePath
@@ -468,20 +468,20 @@ class ViewWriter extends Writer {
 
       ==>${this[_].composeViews('export const ')}<==
 
-      export const sock = ${this.className}.sock
-      export default ${this.className}
+      export const sock = ${this.viewName}.sock
+      export default ${this.viewName}
     `)
   }
 
   _composeViewArray() {
     return [
-      this.classPath,
+      this.viewPath,
       ...this[_].children.map(child => child[_].composeViewArray()).flat()
     ]
   }
 
   _composeViews(prefix = '') {
-    const classPath = this.classPath
+    const viewPath = this.viewPath
 
     const jsx = [
       this[_].composeStyleImports(),
@@ -504,7 +504,7 @@ class ViewWriter extends Writer {
     ].filter(Boolean)
 
     const decl = [
-      `${classPath}.sock = Object.freeze({${socks}})`,
+      `${viewPath}.sock = Object.freeze({${socks}})`,
       scripts,
       ...this[_].children.map(child => {
         return child[_].composeViews()
@@ -513,11 +513,11 @@ class ViewWriter extends Writer {
 
     return freeText(`
       /**
-        ${classPath}
-        ${'-'.repeat(classPath.length)}
+        ${viewPath}
+        ${'-'.repeat(viewPath.length)}
         ==>${docstring}<==
       */
-      ${prefix}${classPath} = (props) => {
+      ${prefix}${viewPath} = (props) => {
         ==>${body.join('\n\n')}<==
       }
 
@@ -623,10 +623,10 @@ class ViewWriter extends Writer {
 
     if (content.length === 0) return ['', '']
 
-    const classPath = this.classPath
-    const hook = `useScripts(${classPath}.scripts)`
+    const viewPath = this.viewPath
+    const hook = `useScripts(${viewPath}.scripts)`
     const decl = freeText(`
-      ${classPath}.scripts = Object.freeze([
+      ${viewPath}.scripts = Object.freeze([
         ==>${content.join('\n')}<==
       ])
     `)
@@ -656,7 +656,7 @@ class ViewWriter extends Writer {
   }
 }
 
-function bindJSX(jsx, classPath) {
+function bindJSX(jsx, viewPath) {
   const decode = encoded => JSON.parse(base32.decode(encoded))
   
   // ORDER MATTERS
@@ -669,7 +669,7 @@ function bindJSX(jsx, classPath) {
       const { sock, repeat } = decode(encoded)
       // If there are nested sockets
       return /<[\w._-]+-af-sock-\d+-\w+/.test(content) ? (
-        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content, classPath)}</>)}</T>)}`
+        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content, viewPath)}</>)}</T>)}`
       ) : (
         `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children ? props.children : <>${content}</>}</T>)}`
       )
@@ -683,7 +683,7 @@ function bindJSX(jsx, classPath) {
       // Handle sockets for child views
       if (el.startsWith('af-view-')) {
         el = decode(el.slice(8)).name
-        return `{proxy('${sock}', '${repeat}', (props, T=${classPath}.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>)}`
+        return `{proxy('${sock}', '${repeat}', (props, T=${viewPath}.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>)}`
       }
       return `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children}</T>)}`
     })
@@ -692,7 +692,7 @@ function bindJSX(jsx, classPath) {
       /<af-view-(\w+)(.*?)\/>/g, (
       _match, encoded
     ) => {
-      return `<${classPath}.${decode(encoded).name}/>`
+      return `<${viewPath}.${decode(encoded).name}/>`
     })
   }
 
