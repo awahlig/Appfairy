@@ -27,6 +27,7 @@
     "node-fetch": "^2.1.2",
     "resolve": "^1.8.1",
     "root-require": "^0.3.1",
+    "semver": "^7.3.8",
     "source-map-support": "^0.5.9",
     "statuses": "^1.5.0",
     "uglify-js": "^3.4.5"

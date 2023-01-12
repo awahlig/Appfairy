@@ -1,10 +1,11 @@
 import cheerio from 'cheerio'
 import path from 'path'
 import git from './git'
+import semver from 'semver'
 import { promises as fs } from 'fs'
 import { mkdirp } from 'fs-extra'
 import { readJson, writeJson } from 'fs-extra'
-import { encapsulateCSS, version } from './utils'
+import { encapsulateCSS, version, askToContinue } from './utils'
 import { ViewWriter, ScriptWriter, StyleWriter } from './writers'
 import anzip from 'anzip'
 
@@ -20,6 +21,12 @@ export const transpile = async (config) => {
   await readJson(config.output.migration).then(async (migration) => {
     // Delete migrated files and the state file
     console.log('Clearing previous migration ...')
+    const mver = migration.version
+    if (mver && semver.gt(mver, version)) {
+      console.warn(`Warning! Previous migration is from a newer version `
+        + `of appfairy\n${mver} > ${version}`)
+      await askToContinue()
+    }
     deletedFiles = migration.generatedFiles.map((file) =>
       path.join(path.dirname(config.output.migration), file))
     deletedFiles.push(config.output.migration)

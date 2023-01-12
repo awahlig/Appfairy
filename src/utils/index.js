@@ -1,3 +1,4 @@
+import * as readline from 'readline'
 export { default as Internal } from './internal'
 export { default as requireText } from './requireText'
 
@@ -144,4 +145,21 @@ export const absoluteHref = (href) => {
     href = href.match(/[./]+(.*)/)[1]
   }
   return `/${href}`
+}
+
+export const askToContinue = async () => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  const answer = await new Promise(resolve => {
+    rl.question('Continue? [y/N] ', resolve)
+  })
+
+  rl.close()
+
+  if (answer.toLowerCase() !== 'y') {
+    process.exit(0)
+  }
 }
