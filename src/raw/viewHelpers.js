@@ -53,7 +53,8 @@ const transformProxies = (children = []) => {
   React.Children.forEach(children, (child) => {
     const { 'af-sock': sock, ...props } = child.props
 
-    const name = (sock || '').trim().replace(/_/g, '-')
+    const name = (typeof sock === 'object' ? sock[''] : sock || '')
+      .trim().replace(/_/g, '-')
     if (!name) {
       const tag = child.type.name || child.type
       throw new ProxyError(`: missing af-sock= on <${tag}>`)

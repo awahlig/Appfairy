@@ -494,7 +494,8 @@ class ViewWriter extends Writer {
       </>)
     `)
 
-    const [docstring, socks] = this[_].composeDocstringAndSocks()
+    const docstring = this[_].composeDocstring()
+    const socks = this[_].composeSocks()
     const [scriptsHook, scripts] = this[_].composeScriptsDeclerations()
 
     const body = [
@@ -504,7 +505,7 @@ class ViewWriter extends Writer {
     ].filter(Boolean)
 
     const decl = [
-      `${viewPath}.sock = Object.freeze({${socks}})`,
+      `${viewPath}.sock = ${socks}`,
       scripts,
       ...this[_].children.map(child => {
         return child[_].composeViews()
@@ -558,35 +559,54 @@ class ViewWriter extends Writer {
     `)
   }
 
-  _composeDocstringAndSocks() {
+  _composeDocstring() {
     if (Object.keys(this[_].sockets).length === 0) {
-      return ['', '']
+      return ''
     }
 
-    const sock = {}
-    const collectHints = (sockets) =>
+    const collect = (sockets, sockPath = 'sock') =>
       Object.entries(sockets).map(([socketName, props]) => {
-        const ident = socketName.replace(/-/g, '_')
-        sock[ident] = socketName
+        const ident = `${sockPath}.${socketName.replace(/-/g, '_')}`
         const comment = props.repeat ? `// af-repeat='${props.repeat}'\n` : ''
         if (Object.keys(props.sockets).length === 0) {
-          return `${comment}<${props.type} af-sock={sock.${ident}} />`
+          return `${comment}<${props.type} af-sock={${ident}} />`
         }
         const text = comment + freeText(`
-          <${props.type} af-sock={sock.${ident}}>
-            ==>${collectHints(props.sockets)}<==
+          <${props.type} af-sock={${ident}}>
+            ==>${collect(props.sockets, ident)}<==
           </${props.type}>
         `)
         return `\n${text}\n`
       }).join('\n')
 
-    const hints = collectHints(this[_].sockets).trim().replace(/\n\n\n/g, '\n\n')
-    const docstring = `\`\`\`\n${hints}\n\`\`\``
+    const hints = collect(this[_].sockets).trim().replace(/\n\n\n/g, '\n\n')
+    return `\`\`\`\n${hints}\n\`\`\``
+  }
 
-    const sockString = Object.entries(sock).sort().map(([ident, name]) =>
-      `\n  ${ident}: '${name}',`).join('')
+  _composeSocks() {
+    if (Object.keys(this[_].sockets).length === 0) {
+      return 'Object.freeze({})'
+    }
 
-    return [docstring, sockString + '\n']
+    const collect = (sockets) =>
+      Object.entries(sockets).map(([socketName, props]) => {
+        const ident = socketName.replace(/-/g, '_')
+        if (Object.keys(props.sockets).length === 0) {
+          return `${ident}: '${socketName}',`
+        }
+        return freeText(`
+          ${ident}: Object.freeze({
+            '': '${socketName}',
+            ==>${collect(props.sockets)}<==
+          }),
+        `)
+      }).join('\n')
+
+      return freeText(`
+        Object.freeze({
+          ==>${collect(this[_].sockets)}<==
+        })
+      `)
   }
 
   _composeEffects() {
