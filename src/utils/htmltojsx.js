@@ -630,7 +630,9 @@ HTMLtoJSX.prototype = {
           result += '={' + attribute.value + '}';
         } else if (attribute.value.length > 0) {
           result += '="' + attribute.value.replace(/"/gm, '&quot;') + '"';
-        } else if(attribute.value.length === 0 && attribute.name === 'alt') {
+        } else if(attribute.value.length === 0
+            && (attribute.name === 'alt'
+             || attribute.name === 'placeholder')) {
           result += '=""';
         }
         return result;
