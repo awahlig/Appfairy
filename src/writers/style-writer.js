@@ -96,7 +96,7 @@ class StyleWriter extends Writer {
 
       const writingIndex = (async () => {
         const indexText = freeLint(`
-          export { default } from './common'
+          export { default } from "./common";
         `);
         await fs.writeFile(indexFilePath, indexText);
         outputFiles.push(indexFilePath);
@@ -133,7 +133,7 @@ class StyleWriter extends Writer {
     const writingIndex = (async () => {
       const stylesIndexContent = styleFileNames
         .map((styleFileName) => {
-          return `import './${styleFileName}'`;
+          return `import "./${styleFileName}";`;
         })
         .join("\n");
 
@@ -176,8 +176,8 @@ class StyleWriter extends Writer {
     const styles = this[_].styles
       .map((style) => {
         const fields = {
-          ...(style.href && { href: `'${style.href}'` }),
-          ...(style.body && { body: `'${escape(style.body, "'")}'` }),
+          ...(style.href && { href: `"${style.href}"` }),
+          ...(style.body && { body: `"${escape(style.body, '"')}"` }),
         };
         const text = Object.entries(fields)
           .map(([key, value]) => `${key}: ${value}`)
@@ -191,9 +191,9 @@ class StyleWriter extends Writer {
         export default Promise.all(loadingStyles).then(() => {
           const styleSheets = Array.from(document.styleSheets).filter((styleSheet) => {
             return styleSheet.href && styles.some((style) => {
-              return style.type == 'href' && styleSheet.href.match(style.body)
-            })
-          })
+              return style.type == 'href' && styleSheet.href.match(style.body);
+            });
+          });
           styleSheets.forEach((styleSheet) => {
             Array.from(styleSheet.rules).forEach((rule) => {
               if (rule.selectorText) {
@@ -205,20 +205,20 @@ class StyleWriter extends Writer {
                   .replace(/\\.af-view body/g, '.af-view')
                   ==>${this[_].composeSourceReplacements()}<==
               }
-            })
-          })
-        })
+            });
+          });
+        });
       `)
       : "";
 
     return freeLint(`
-      import { loadStyles } from './helpers'
+      import { loadStyles } from "./helpers";
 
       const loadingStyles = loadStyles([
         ==>${styles}<==
-      ])
+      ]);
       ==>${fix}<==
-      export default loadingStyles
+      export default loadingStyles;
     `);
   }
 

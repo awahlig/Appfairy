@@ -84,7 +84,7 @@ class ScriptWriter extends Writer {
 
       const writingIndex = (async () => {
         const indexText = freeLint(`
-          export { default } from './common'
+          export { default } from "./common";
         `);
         await fs.writeFile(indexFilePath, indexText);
         outputFiles.push(indexFilePath);
@@ -123,7 +123,7 @@ class ScriptWriter extends Writer {
 
         ==>${freeText(code)}<==
 
-        }).call(window)
+        }).call(window);
       `);
 
       return fs.writeFile(`${dir}/${scriptFileName}`, code);
@@ -132,7 +132,7 @@ class ScriptWriter extends Writer {
     const writingIndex = (async () => {
       const scriptsIndexContent = scriptFileNames
         .map((scriptFileName) => {
-          return `import './${scriptFileName}'`;
+          return `import "./${scriptFileName}";`;
         })
         .join("\n");
 
@@ -171,8 +171,8 @@ class ScriptWriter extends Writer {
     const scripts = this[_].scripts
       .map((script) => {
         const fields = {
-          ...(script.src && { src: `'${script.src}'` }),
-          ...(script.body && { body: `'${escape(script.body, "'")}'` }),
+          ...(script.src && { src: `"${script.src}"` }),
+          ...(script.body && { body: `"${escape(script.body, '"')}"` }),
           ...(script.isAsync && { isAsync: true }),
         };
         const text = Object.entries(fields)
@@ -183,13 +183,13 @@ class ScriptWriter extends Writer {
       .join("\n");
 
     return freeLint(`
-      import { loadScripts } from './helpers'
+      import { loadScripts } from "./helpers";
 
       const loadingScripts = loadScripts([
         ==>${scripts}<==
-      ])
+      ]);
 
-      export default loadingScripts
+      export default loadingScripts;
     `);
   }
 }

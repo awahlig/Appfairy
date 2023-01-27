@@ -55,7 +55,7 @@ class ViewWriter extends Writer {
           })
           .map(
             (viewWriter) =>
-              `export { ${viewWriter.viewName} } from './${viewWriter.viewName}'`
+              `export { ${viewWriter.viewName} } from "./${viewWriter.viewName}";`
           )
           .join("\n");
 
@@ -324,14 +324,14 @@ class ViewWriter extends Writer {
 
       if (!/^[a-z_-][0-9a-z_-]*$/.test(sock)) {
         const ns = getSockNamespace($el).join(".");
-        throw `error: invalid af-sock='${sock}' under '${ns}' in view ${this.viewPath}`;
+        throw `error: invalid af-sock="${sock}" under "${ns}" in view ${this.viewPath}`;
       }
 
       const normSock = sock.replace(/_/g, "-");
 
       if (!/^[?*+!]?$/.test(repeat)) {
         const sockPath = getSockNamespace($el).concat(normSock).join(".");
-        throw `error: invalid af-repeat='${repeat}' for socket '${sockPath}' in view ${this.viewPath}`;
+        throw `error: invalid af-repeat="${repeat}" for socket "${sockPath}" in view ${this.viewPath}`;
       }
 
       $el.attr("af-sock", normSock);
@@ -471,10 +471,10 @@ class ViewWriter extends Writer {
 
   _compose() {
     return freeLint(`
-      import { useEffect } from 'react'
-      import { useScripts, createScope } from '${this[_].importPath(
+      import { useEffect } from "react";
+      import { useScripts, createScope } from "${this[_].importPath(
         "./helpers"
-      )}'
+      )}";
 
       /*
         ==>${this[_].composeViewArray().join("\n")}<==
@@ -482,8 +482,8 @@ class ViewWriter extends Writer {
 
       ==>${this[_].composeViews("export const ")}<==
 
-      export const sock = ${this.viewName}.sock
-      export default ${this.viewName}
+      export const sock = ${this.viewName}.sock;
+      export default ${this.viewName};
     `);
   }
 
@@ -502,7 +502,7 @@ class ViewWriter extends Writer {
     const render = freeText(`
       return createScope(props.children, proxy => <>
         ==>${jsx.join("\n")}<==
-      </>)
+      </>);
     `);
 
     const docstring = this[_].composeDocstring();
@@ -514,7 +514,7 @@ class ViewWriter extends Writer {
     );
 
     const decl = [
-      `${viewPath}.sock = ${socks}`,
+      `${viewPath}.sock = ${socks};`,
       scripts,
       ...this[_].children.map((child) => {
         return child[_].composeViews();
@@ -529,7 +529,7 @@ class ViewWriter extends Writer {
       */
       ${prefix}${viewPath} = (props) => {
         ==>${body.join("\n\n")}<==
-      }
+      };
 
       ==>${decl.join("\n\n")}<==
     `);
@@ -586,7 +586,7 @@ class ViewWriter extends Writer {
         .map(([socketName, props]) => {
           const ident = `${sockPath}.${socketName.replace(/-/g, "_")}`;
           const comment = props.repeat
-            ? `// af-repeat='${props.repeat}'\n`
+            ? `// af-repeat="${props.repeat}"\n`
             : "";
           if (Object.keys(props.sockets).length === 0) {
             return `${comment}<${props.type} af-sock={${ident}} />`;
@@ -618,11 +618,11 @@ class ViewWriter extends Writer {
         .map(([socketName, props]) => {
           const ident = socketName.replace(/-/g, "_");
           if (Object.keys(props.sockets).length === 0) {
-            return `${ident}: '${socketName}',`;
+            return `${ident}: "${socketName}",`;
           }
           return freeText(`
           ${ident}: Object.freeze({
-            '': '${socketName}',
+            "": "${socketName}",
             ==>${collect(props.sockets)}<==
           }),
         `);
@@ -644,7 +644,7 @@ class ViewWriter extends Writer {
     return freeText(`
       useEffect(() => {
         ==>${content.join("\n\n")}<==
-      }, [])
+      }, []);
     `);
   }
 
@@ -654,11 +654,11 @@ class ViewWriter extends Writer {
         const minified = uglify.minify(script.body).code;
         // Unknown script format ??? fallback to maxified version
         const code = minified || script.body;
-        return `${escape(code, "'")}`;
+        return `${escape(code, '"')}`;
       };
       const fields = {
-        ...(script.src && { src: `'${script.src}'` }),
-        ...(script.body && { body: `'${getBody()}'` }),
+        ...(script.src && { src: `"${script.src}"` }),
+        ...(script.body && { body: `"${getBody()}"` }),
         ...(script.isAsync && { isAsync: true }),
       };
       const text = Object.entries(fields)
@@ -670,11 +670,11 @@ class ViewWriter extends Writer {
     if (content.length === 0) return ["", ""];
 
     const viewPath = this.viewPath;
-    const hook = `useScripts(${viewPath}.scripts)`;
+    const hook = `useScripts(${viewPath}.scripts);`;
     const decl = freeText(`
       ${viewPath}.scripts = Object.freeze([
         ==>${content.join("\n")}<==
-      ])
+      ]);
     `);
 
     return [hook, decl];
@@ -685,10 +685,10 @@ class ViewWriter extends Writer {
       return "";
     }
 
-    const lines = ["const htmlEl = document.querySelector('html')"];
+    const lines = ['const htmlEl = document.querySelector("html");'];
 
     for (let [attr, value] of this[_].wfData) {
-      lines.push(`htmlEl.dataset['${attr}'] = '${value}'`);
+      lines.push(`htmlEl.dataset["${attr}"] = "${value}";`);
     }
 
     return lines.join("\n");
@@ -711,16 +711,16 @@ function bindJSX(jsx, viewPath) {
         /<([\w._-]+)-af-sock-(\d+)-(\w+)(.*?)>([^]*)<\/\1-af-sock-\2-\3>/g,
         (_match, el, _index, encoded, attrs, content) => {
           const { sock, repeat } = decode(encoded);
-          const repeatArg = repeat ? `, '${repeat}'` : "";
+          const repeatArg = repeat ? `, "${repeat}"` : "";
           // If there are nested sockets
           return /<[\w._-]+-af-sock-\d+-\w+/.test(content)
-            ? `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(
+            ? `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
                 attrs
               )}>{createScope(props.children, proxy => <>${bindJSX(
                 content,
                 viewPath
               )}</>)}</T>${repeatArg})}`
-            : `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(
+            : `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
                 attrs
               )}>{props.children ? props.children : <>${content}</>}</T>${repeatArg})}`;
         }
@@ -730,15 +730,15 @@ function bindJSX(jsx, viewPath) {
         /<([\w._-]+)-af-sock-\d+-(\w+)(.*?)\/>/g,
         (_match, el, encoded, attrs) => {
           const { sock, repeat } = decode(encoded);
-          const repeatArg = repeat ? `, '${repeat}'` : "";
+          const repeatArg = repeat ? `, "${repeat}"` : "";
           // Handle sockets for child views
           if (el.startsWith("af-view-")) {
             el = decode(el.slice(8)).name;
-            return `{proxy('${sock}', (props, T=${viewPath}.${el}) => <T ${mergeProps(
+            return `{proxy("${sock}", (props, T=${viewPath}.${el}) => <T ${mergeProps(
               attrs
             )}>{props.children}</T>${repeatArg})}`;
           }
-          return `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(
+          return `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
             attrs
           )}>{props.children}</T>${repeatArg})}`;
         }
@@ -767,7 +767,7 @@ function mergeProps(attrs) {
   className = className[1];
   attrs = attrs.replace(/ ?className="[^"]+"/, "");
 
-  return `${attrs} {...{...props, className: \`${className} $\{props.className || ''}\`}}`.trim();
+  return `${attrs} {...{...props, className: \`${className} $\{props.className || ""}\`}}`.trim();
 }
 
 export default ViewWriter;
