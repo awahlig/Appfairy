@@ -91,7 +91,7 @@ const transformProxies = (children = []) => {
 export const createScope = (children, callback) => {
   const proxies = transformProxies(children)
 
-  const result = callback((name, repeat, callback) => {
+  const result = callback((name, callback, repeat = '') => {
     const props = proxies[name]
 
     const call = (props) => {

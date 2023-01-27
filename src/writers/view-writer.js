@@ -687,11 +687,12 @@ function bindJSX(jsx, viewPath) {
       _match, el, _index, encoded, attrs, content
     ) => {
       const { sock, repeat } = decode(encoded)
+      const repeatArg = repeat ? `, '${repeat}'` : ''
       // If there are nested sockets
       return /<[\w._-]+-af-sock-\d+-\w+/.test(content) ? (
-        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content, viewPath)}</>)}</T>)}`
+        `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(attrs)}>{createScope(props.children, proxy => <>${bindJSX(content, viewPath)}</>)}</T>${repeatArg})}`
       ) : (
-        `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children ? props.children : <>${content}</>}</T>)}`
+        `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children ? props.children : <>${content}</>}</T>${repeatArg})}`
       )
     })
     // Self closing
@@ -700,12 +701,13 @@ function bindJSX(jsx, viewPath) {
       _match, el, encoded, attrs
     ) => {
       const { sock, repeat } = decode(encoded)
+      const repeatArg = repeat ? `, '${repeat}'` : ''
       // Handle sockets for child views
       if (el.startsWith('af-view-')) {
         el = decode(el.slice(8)).name
-        return `{proxy('${sock}', '${repeat}', (props, T=${viewPath}.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>)}`
+        return `{proxy('${sock}', (props, T=${viewPath}.${el}) => <T ${mergeProps(attrs)}>{props.children}</T>${repeatArg})}`
       }
-      return `{proxy('${sock}', '${repeat}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children}</T>)}`
+      return `{proxy('${sock}', (props, T='${el}') => <T ${mergeProps(attrs)}>{props.children}</T>${repeatArg})}`
     })
     // Decode non-socket child views
     .replace(
