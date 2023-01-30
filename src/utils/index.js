@@ -75,7 +75,7 @@ export const freeText = (text) => {
   {
     return content
       .split('\n')
-      .map(line => `${baseIndent}${line}`)
+      .map(line => line ? `${baseIndent}${line}` : '')
       .join('\n')
   })
 
