@@ -1,19 +1,19 @@
-import path from 'path'
-import { requireText } from '../utils'
+import path from "path";
+import { requireText } from "../utils";
 
-const resolve = filename => path.resolve(__dirname, '../src/raw', filename)
+const resolve = (filename) => path.resolve(__dirname, "../src/raw", filename);
 
 // Exporting an object since we're dealing with a getter
 export default {
   get scriptHelpers() {
-    return requireText(resolve('scriptHelpers.js'))
+    return requireText(resolve("scriptHelpers.js"));
   },
 
   get styleHelpers() {
-    return requireText(resolve('styleHelpers.js'))
+    return requireText(resolve("styleHelpers.js"));
   },
 
   get viewHelpers() {
-    return requireText(resolve('viewHelpers.js'))
+    return requireText(resolve("viewHelpers.js"));
   },
-}
+};
