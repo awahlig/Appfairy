@@ -1,5 +1,4 @@
 import cheerio from "cheerio";
-import HTMLtoJSX from "../utils/htmltojsx";
 import base32 from "base32";
 import path from "path";
 import statuses from "statuses";
@@ -18,6 +17,7 @@ import {
   splitWords,
   upperFirst,
   absoluteHref,
+  HTMLtoJSX,
 } from "../utils";
 
 const _ = Symbol("_ViewWriter");

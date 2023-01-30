@@ -1,6 +1,7 @@
 import * as readline from "readline";
 export { default as Internal } from "./internal";
 export { default as requireText } from "./requireText";
+export { default as HTMLtoJSX } from "./htmltojsx";
 
 // Appfairy version
 export const version = require("root-require")("./package.json").version;

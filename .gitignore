@@ -1,4 +1,3 @@
-build
-node_modules
-npm-debug.log
-/.devcontainer
+/build
+/node_modules
+/npm-debug.log

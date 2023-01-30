@@ -4,7 +4,6 @@ import path from "path";
 import raw from "../raw";
 import { promises as fs } from "fs";
 import { mkdirp } from "fs-extra";
-import { encapsulateCSS, absoluteHref } from "../utils";
 import Writer from "./writer";
 
 import {
@@ -14,6 +13,8 @@ import {
   freeLint,
   padLeft,
   requireText,
+  encapsulateCSS,
+  absoluteHref,
 } from "../utils";
 
 const _ = Symbol("_StyleWriter");
