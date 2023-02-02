@@ -31,6 +31,14 @@ export const useIX2 = (deps) => {
   }, deps);
 };
 
+/**
+ * Use to update selected links. Runs webflow code that compares href
+ * of links to the current browser location.
+ */
+export const useLinks = () => {
+  React.useEffect(linksReady, []);
+};
+
 export const ix2init = () => {
   if (ix2init.busy) return;
   ix2init.busy = true;
@@ -43,6 +51,11 @@ export const ix2init = () => {
   Promise.resolve().then(() => {
     ix2init.busy = false;
   });
+};
+
+export const linksReady = () => {
+  // eslint-disable-next-line no-undef
+  window?.Webflow?.require("links").ready();
 };
 
 const transformProxies = (children = []) => {
