@@ -168,17 +168,14 @@ class StyleWriter extends Writer {
   }
 
   _composeCommonLoader() {
-    this[_].styles.forEach((style) => {
-      if (style.body) {
-        style.body = this[_].transformSheet(style.body);
-      }
-    });
-
     const styles = this[_].styles
-      .map((style) => {
+      .map(({ href, body }) => {
+        if (body) {
+          body = this[_].transformSheet(body);
+        }
         const fields = {
-          ...(style.href && { href: `"${style.href}"` }),
-          ...(style.body && { body: `"${escape(style.body, '"')}"` }),
+          ...(href && { href: `"${href}"` }),
+          ...(body && { body: `"${escape(body, '"')}"` }),
         };
         const text = Object.entries(fields)
           .map(([key, value]) => `${key}: ${value}`)

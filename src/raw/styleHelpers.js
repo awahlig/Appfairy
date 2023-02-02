@@ -1,9 +1,15 @@
+const loadingStyles = {};
+
 export const loadStyles = (styles) => {
   return Promise.all(
     styles.map((style) => {
-      let styleEl;
-      let loading;
+      const key = style.body ? style.body : style.href;
+      let loading = loadingStyles[key];
+      if (loading) {
+        return loading;
+      }
 
+      let styleEl;
       if (style.body) {
         // eslint-disable-next-line no-undef
         styleEl = document.createElement("style");
@@ -29,6 +35,7 @@ export const loadStyles = (styles) => {
       // eslint-disable-next-line no-undef
       document.head.appendChild(styleEl);
 
+      loadingStyles[key] = loading;
       return loading;
     })
   );

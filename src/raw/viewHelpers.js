@@ -1,5 +1,6 @@
 import React from "react";
 import { loadScripts } from "../scripts/helpers";
+import { loadStyles } from "../styles/helpers";
 
 export class ProxyError extends Error {
   constructor(message) {
@@ -8,12 +9,17 @@ export class ProxyError extends Error {
   }
 }
 
-export const useScripts = (scripts) => {
+export const useHead = (scripts = [], styles = []) => {
+  const [loaded, setLoaded] = React.useState(false);
   React.useEffect(() => {
-    if (scripts) {
-      loadScripts(scripts).then(ix2init);
-    }
-  }, [scripts]);
+    Promise.all([loadScripts(scripts), loadStyles(styles)]).then(() => {
+      setLoaded(true);
+    });
+  }, [scripts, styles]);
+  React.useEffect(() => {
+    if (loaded) ix2init();
+  }, [loaded]);
+  return loaded;
 };
 
 /**

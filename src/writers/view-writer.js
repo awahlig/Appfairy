@@ -7,6 +7,7 @@ import { promises as fs } from "fs";
 import { mkdirp } from "fs-extra";
 import raw from "../raw";
 import Writer from "./writer";
+import CleanCSS from "clean-css";
 
 import {
   encapsulateCSS,
@@ -448,33 +449,27 @@ class ViewWriter extends Writer {
     return filePath;
   }
 
-  setStyle(href, content) {
-    let type;
-    let body;
-
+  setStyle(href, body) {
     if (href) {
-      type = "href";
-      body = absoluteHref(href);
+      href = absoluteHref(href);
+      body = undefined;
     } else {
-      type = "sheet";
-      body = content;
+      href = undefined;
     }
 
     const exists = this[_].styles.some((style) => {
-      return style.body == body;
+      return style.href === href && style.body === body;
     });
 
     if (!exists) {
-      this[_].styles.push({ type, body });
+      this[_].styles.push({ ...(href && { href }), ...(body && { body }) });
     }
   }
 
   _compose() {
     return freeLint(`
       import { useEffect } from "react";
-      import { useScripts, createScope } from "${this[_].importPath(
-        "./helpers"
-      )}";
+      import { useHead, createScope } from "${this[_].importPath("./helpers")}";
 
       /*
         ==>${this[_].composeViewArray().join("\n")}<==
@@ -497,25 +492,38 @@ class ViewWriter extends Writer {
   _composeViews(prefix = "") {
     const viewPath = this.viewPath;
 
-    const jsx = [this[_].composeStyleImports(), this.jsx].filter(Boolean);
-
     const render = freeText(`
-      return createScope(props.children, proxy => <>
-        ==>${jsx.join("\n")}<==
-      </>);
+      return createScope(props.children, proxy =>
+        ==>${this.jsx}<==
+      );
     `);
 
     const docstring = this[_].composeDocstring();
     const socks = this[_].composeSocks();
-    const [scriptsHook, scripts] = this[_].composeScriptsDeclerations();
+    const scripts = this[_].composeScripts();
+    const styles = this[_].composeStyles();
 
-    const body = [scriptsHook, this[_].composeEffects(), render].filter(
-      Boolean
-    );
+    let headHook = "";
+    let fallback = "";
+    if (scripts || styles) {
+      headHook = `const loaded = useHead(${viewPath}.scripts, ${viewPath}.styles);`;
+      fallback = freeText(`
+      if (!loaded) {
+        return props.fallback;
+      }
+    `);
+    }
+
+    const body = [
+      headHook,
+      this[_].composeEffects(),
+      [fallback, render].filter(Boolean).join("\n"),
+    ].filter(Boolean);
 
     const decl = [
       `${viewPath}.sock = ${socks};`,
       scripts,
+      styles,
       ...this[_].children.map((child) => {
         return child[_].composeViews();
       }),
@@ -532,47 +540,6 @@ class ViewWriter extends Writer {
       };
 
       ==>${decl.join("\n\n")}<==
-    `);
-  }
-
-  _composeStyleImports() {
-    const hrefs = this[_].styles
-      .map(({ type, body }) => {
-        return type == "href" && body;
-      })
-      .filter(Boolean);
-
-    const sheets = this[_].styles
-      .map(({ type, body }) => {
-        return type == "sheet" && body;
-      })
-      .filter(Boolean);
-
-    let css = "";
-
-    css += hrefs
-      .map((href) => {
-        return `@import url(${href});`;
-      })
-      .join("\n");
-
-    css += "\n\n";
-
-    css += sheets
-      .map((sheet) => {
-        return sheet;
-      })
-      .join("\n\n");
-
-    const imports = escape(css.trim());
-    if (!imports) {
-      return "";
-    }
-
-    return freeText(`
-      <style dangerouslySetInnerHTML={{ __html: \`
-        ==>${imports}<==
-      \` }} />
     `);
   }
 
@@ -648,7 +615,7 @@ class ViewWriter extends Writer {
     `);
   }
 
-  _composeScriptsDeclerations() {
+  _composeScripts() {
     const content = this[_].scripts.map((script) => {
       const getBody = () => {
         const minified = uglify.minify(script.body).code;
@@ -667,17 +634,39 @@ class ViewWriter extends Writer {
       return `{ ${text} },`;
     });
 
-    if (content.length === 0) return ["", ""];
+    if (content.length === 0) return "";
 
-    const viewPath = this.viewPath;
-    const hook = `useScripts(${viewPath}.scripts);`;
-    const decl = freeText(`
-      ${viewPath}.scripts = Object.freeze([
+    return freeText(`
+      ${this.viewPath}.scripts = Object.freeze([
         ==>${content.join("\n")}<==
       ]);
     `);
+  }
 
-    return [hook, decl];
+  _composeStyles() {
+    const cleanCSS = new CleanCSS();
+
+    const content = this[_].styles.map(({ href, body }) => {
+      if (body) {
+        body = cleanCSS.minify(body).styles;
+      }
+      const fields = {
+        ...(href && { href: `"${href}"` }),
+        ...(body && { body: `"${escape(body, '"')}"` }),
+      };
+      const text = Object.entries(fields)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(", ");
+      return `{ ${text} },`;
+    });
+
+    if (content.length === 0) return "";
+
+    return freeText(`
+      ${this.viewPath}.styles = Object.freeze([
+        ==>${content.join("\n")}<==
+      ]);
+    `);
   }
 
   _composeWfDataAttrs() {
