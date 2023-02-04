@@ -511,6 +511,10 @@ class ViewWriter extends Writer {
     const scripts = this[_].composeScripts();
     const styles = this[_].composeStyles();
 
+    const comment = [viewPath, "-".repeat(viewPath.length), docstring].filter(
+      Boolean
+    );
+
     let headHook = "";
     let fallback = "";
     if (scripts || styles) {
@@ -539,9 +543,7 @@ class ViewWriter extends Writer {
 
     return freeText(`
       /**
-        ${viewPath}
-        ${"-".repeat(viewPath.length)}
-        ==>${docstring}<==
+        ==>${comment.join("\n")}<==
       */
       ${prefix}${viewPath} = (props) => {
         ==>${body.join("\n\n")}<==
