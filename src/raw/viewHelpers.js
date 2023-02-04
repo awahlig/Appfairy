@@ -22,46 +22,22 @@ export const useHead = (scripts = [], styles = []) => {
   return loaded;
 };
 
-/**
- * Use when dynamically adding elements for which IX2 interactions have
- * been defined in Webflow. It forces IX2 to rescan the page and attach
- * event handlers to the new elements. Argument is a dependencies array
- * used to determine when a rescan is necessary, similar to useEffect().
- */
-export const useIX2 = (deps) => {
-  const ref = React.useRef(false);
-  React.useEffect(() => {
-    if (ref.current) ix2init();
-    else ref.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-};
-
-/**
- * Use to update selected links. Runs webflow code that compares href
- * of links to the current browser location.
- */
-export const useLinks = () => {
-  React.useEffect(linksReady, []);
+export const getWebflow = () => {
+  // eslint-disable-next-line no-undef
+  return window.Webflow;
 };
 
 export const ix2init = () => {
   if (ix2init.busy) return;
   ix2init.busy = true;
 
-  // eslint-disable-next-line no-undef
-  window?.Webflow?.require("ix2").init();
+  getWebflow()?.require("ix2")?.init();
   // eslint-disable-next-line no-undef
   document.dispatchEvent(new CustomEvent("IX2_PAGE_UPDATE"));
 
   Promise.resolve().then(() => {
     ix2init.busy = false;
   });
-};
-
-export const linksReady = () => {
-  // eslint-disable-next-line no-undef
-  window?.Webflow?.require("links").ready();
 };
 
 const transformProxies = (children = []) => {
