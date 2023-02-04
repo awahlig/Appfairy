@@ -118,9 +118,9 @@ export const freeLint = (script) => {
   `);
 };
 
-// upper -> Upper
+// uppEr -> Upper
 export const upperFirst = (str) => {
-  return str.substr(0, 1).toUpperCase() + str.substr(1);
+  return str.substr(0, 1).toUpperCase() + str.substr(1).toLowerCase();
 };
 
 // foo_barBaz -> ['foo', 'bar', 'Baz']

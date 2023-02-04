@@ -229,6 +229,10 @@ class ViewWriter extends Writer {
       $view = $view.insertAfter($el);
       $el.remove();
 
+      if (!/^[a-z_-][0-9a-z_-]*$/i.test(name)) {
+        throw `error: invalid af-view="${name}" in view ${this.viewPath}`;
+      }
+
       const child = new ViewWriter({
         name,
         html: $.html($el),
@@ -323,12 +327,16 @@ class ViewWriter extends Writer {
         return;
       }
 
-      if (!/^[a-z_-][0-9a-z_-]*$/.test(sock)) {
+      if (!/^[a-z_-][0-9a-z_-]*$/i.test(sock)) {
         const ns = getSockNamespace($el).join(".");
         throw `error: invalid af-sock="${sock}" under "${ns}" in view ${this.viewPath}`;
       }
 
-      const normSock = sock.replace(/_/g, "-");
+      const words = splitWords(sock);
+      const normSock = [
+        words.slice(0, 1),
+        ...words.slice(1).map(upperFirst),
+      ].join("");
 
       if (!/^[?*+!]?$/.test(repeat)) {
         const sockPath = getSockNamespace($el).concat(normSock).join(".");
@@ -551,7 +559,7 @@ class ViewWriter extends Writer {
     const collect = (sockets, sockPath = "sock") =>
       Object.entries(sockets)
         .map(([socketName, props]) => {
-          const ident = `${sockPath}.${socketName.replace(/-/g, "_")}`;
+          const ident = `${sockPath}.${socketName}`;
           const comment = props.repeat
             ? `// af-repeat="${props.repeat}"\n`
             : "";
@@ -583,12 +591,11 @@ class ViewWriter extends Writer {
     const collect = (sockets) =>
       Object.entries(sockets)
         .map(([socketName, props]) => {
-          const ident = socketName.replace(/-/g, "_");
           if (Object.keys(props.sockets).length === 0) {
-            return `${ident}: "${socketName}",`;
+            return `${socketName}: "${socketName}",`;
           }
           return freeText(`
-          ${ident}: Object.freeze({
+          ${socketName}: Object.freeze({
             "": "${socketName}",
             ==>${collect(props.sockets)}<==
           }),
