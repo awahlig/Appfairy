@@ -595,8 +595,7 @@ class ViewWriter extends Writer {
             return `${socketName}: "${socketName}",`;
           }
           return freeText(`
-          ${socketName}: Object.freeze({
-            "": "${socketName}",
+          ${socketName}: Object.freeze({ "": "${socketName}",
             ==>${collect(props.sockets)}<==
           }),
         `);
