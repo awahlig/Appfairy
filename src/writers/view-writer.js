@@ -306,13 +306,11 @@ class ViewWriter extends Writer {
 
     const sockets = (this[_].sockets = {});
 
-    const getSockNamespace = ($el) => {
-      return $el
-        .parents("[af-sock]")
-        .toArray()
-        .reverse()
-        .map((el) => $(el).attr("af-sock"));
-    };
+    const getSockParents = ($el) =>
+      $el.parents("[af-sock]").toArray().reverse();
+
+    const getSockNamespace = ($el) =>
+      getSockParents($el).map((el) => $(el).attr("af-sock"));
 
     // Validate the "af-sock" and "af-repeat" attributes
     $("[af-sock]").each((_, el) => {
@@ -347,8 +345,8 @@ class ViewWriter extends Writer {
       $el.attr("af-repeat", repeat);
     });
 
-    // Build the socket tree
-    $("[af-sock]").each((_, el) => {
+    // Build the socket tree and encode socket data into the tag name
+    $("[af-sock]").each((i, el) => {
       const $el = $(el);
       const sock = $el.attr("af-sock");
       const repeat = $el.attr("af-repeat");
@@ -359,28 +357,23 @@ class ViewWriter extends Writer {
         type = viewData.name;
       }
 
-      const group = $el
-        .parents("[af-sock]")
-        .toArray()
-        .reverse()
-        .reduce((acc, el) => acc[$(el).attr("af-sock")].sockets, sockets);
+      const group = getSockParents($el).reduce(
+        (acc, el) => acc[$(el).attr("af-sock")].sockets,
+        sockets
+      );
       group[sock] = { type, repeat, sockets: {} };
-    });
-
-    // Encode socket data into the tag name
-    $("[af-sock]").each((i, el) => {
-      const $el = $(el);
-
-      const sock = $el.attr("af-sock");
-      const repeat = $el.attr("af-repeat");
-
-      $el.attr("af-sock", null);
-      $el.attr("af-repeat", null);
 
       const data = { sock, repeat };
       const encoded = base32.encode(JSON.stringify(data));
       el.tagName += `-af-sock-${i}-${encoded}`;
     });
+
+    const removeAttr = (name) =>
+      $(`[${name}]`).each((_, el) => $(el).attr(name, null));
+
+    // Remove af- attributes
+    removeAttr("af-sock");
+    removeAttr("af-repeat");
 
     // Refetch modified html
     html = $body.html();
