@@ -1,3 +1,6 @@
+/* Auto-generated using Appfairy.  DO NOT EDIT! */
+/* eslint-disable */
+
 const loadingStyles = {};
 
 export const loadStyles = (styles) => {

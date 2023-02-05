@@ -1,3 +1,6 @@
+/* Auto-generated using Appfairy.  DO NOT EDIT! */
+/* eslint-disable */
+
 import React from "react";
 import { loadScripts } from "../scripts/helpers";
 import { loadStyles } from "../styles/helpers";

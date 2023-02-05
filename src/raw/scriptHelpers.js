@@ -1,3 +1,6 @@
+/* Auto-generated using Appfairy.  DO NOT EDIT! */
+/* eslint-disable */
+
 const loadingScripts = {};
 
 export const loadScripts = (scripts) => {
