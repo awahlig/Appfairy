@@ -14,33 +14,22 @@ export class ProxyError extends Error {
 
 export const useHead = (scripts = [], styles = []) => {
   const [loaded, setLoaded] = React.useState(false);
+
   React.useEffect(() => {
     Promise.all([loadScripts(scripts), loadStyles(styles)]).then(() => {
       setLoaded(true);
     });
   }, [scripts, styles]);
-  React.useEffect(() => {
-    if (loaded) ix2init();
+
+  React.useLayoutEffect(() => {
+    const Webflow = window.Webflow;
+    if (Webflow && loaded) {
+      Webflow.ready();
+      Webflow.require("ix2")?.init();
+    }
   }, [loaded]);
+
   return loaded;
-};
-
-export const getWebflow = () => {
-  // eslint-disable-next-line no-undef
-  return window.Webflow;
-};
-
-export const ix2init = () => {
-  if (ix2init.busy) return;
-  ix2init.busy = true;
-
-  getWebflow()?.require("ix2")?.init();
-  // eslint-disable-next-line no-undef
-  document.dispatchEvent(new CustomEvent("IX2_PAGE_UPDATE"));
-
-  Promise.resolve().then(() => {
-    ix2init.busy = false;
-  });
 };
 
 const transformProxies = (children = []) => {
