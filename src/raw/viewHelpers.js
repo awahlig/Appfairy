@@ -119,3 +119,5 @@ export const createScope = (children, callback) => {
 
   return result;
 };
+
+export const join = (...args) => args.filter(Boolean).join(" ");

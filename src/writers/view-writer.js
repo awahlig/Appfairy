@@ -470,7 +470,9 @@ class ViewWriter extends Writer {
   _compose() {
     return freeLint(`
       import { useEffect } from "react";
-      import { useHead, createScope } from "${this[_].importPath("./helpers")}";
+      import { useHead, createScope, join } from "${this[_].importPath(
+        "./helpers"
+      )}";
 
       /*
         ==>${this[_].composeViewArray().join("\n")}<==
@@ -710,7 +712,7 @@ class ViewWriter extends Writer {
                 )}</>)}</T>${repeatArg})}`
               : `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
                   attrs
-                )}>{props.children ? props.children : <>${content}</>}</T>${repeatArg})}`;
+                )}>{props.children || <>${content}</>}</T>${repeatArg})}`;
           }
         )
         // Self closing
@@ -743,22 +745,17 @@ class ViewWriter extends Writer {
 
 // Merge props along with class name
 function mergeProps(attrs) {
-  attrs = attrs.trim();
-
-  if (!attrs) {
-    return "{...props}";
-  }
+  attrs = `${attrs.trimEnd()} {...props}`;
 
   let className = attrs.match(/className="([^"]+)"/);
-
   if (!className) {
-    return `${attrs} {...props}`;
+    return attrs.trimStart();
   }
 
   className = className[1];
   attrs = attrs.replace(/ ?className="[^"]+"/, "");
 
-  return `${attrs} {...{...props, className: \`${className} $\{props.className || ""}\`}}`.trim();
+  return `${attrs} className={join("${className}", props.className)}`.trimStart();
 }
 
 export default ViewWriter;
