@@ -381,7 +381,7 @@ class ViewWriter extends Writer {
     // Transforming HTML into JSX
     let jsx = htmltojsx.convert(html).trim();
     // Bind sockets and child views
-    this[_].jsx = bindJSX(jsx, this.viewPath);
+    this[_].jsx = this[_].bindJSX(jsx);
   }
 
   set wfData(dataAttrs) {
@@ -688,56 +688,57 @@ class ViewWriter extends Writer {
     const result = path.relative(this.folder, name).replace(/\\/g, "/");
     return result.startsWith(".") ? result : `./${result}`;
   }
-}
 
-function bindJSX(jsx, viewPath) {
-  const decode = (encoded) => JSON.parse(base32.decode(encoded));
+  _bindJSX(jsx) {
+    const decode = (encoded) => JSON.parse(base32.decode(encoded));
 
-  // ORDER MATTERS
-  return (
-    jsx
-      // Open close
-      .replace(
-        /<([\w._-]+)-af-sock-(\d+)-(\w+)(.*?)>([^]*)<\/\1-af-sock-\2-\3>/g,
-        (_match, el, _index, encoded, attrs, content) => {
-          const { sock, repeat } = decode(encoded);
-          const repeatArg = repeat ? `, "${repeat}"` : "";
-          // If there are nested sockets
-          return /<[\w._-]+-af-sock-\d+-\w+/.test(content)
-            ? `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
+    // ORDER MATTERS
+    return (
+      jsx
+        // Open close
+        .replace(
+          /<([\w._-]+)-af-sock-(\d+)-(\w+)(.*?)>([^]*)<\/\1-af-sock-\2-\3>/g,
+          (_match, el, _index, encoded, attrs, content) => {
+            const { sock, repeat } = decode(encoded);
+            const repeatArg = repeat ? `, "${repeat}"` : "";
+            // If there are nested sockets
+            return /<[\w._-]+-af-sock-\d+-\w+/.test(content)
+              ? `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
+                  attrs
+                )}>{createScope(props.children, proxy => <>${this[_].bindJSX(
+                  content
+                )}</>)}</T>${repeatArg})}`
+              : `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
+                  attrs
+                )}>{props.children ? props.children : <>${content}</>}</T>${repeatArg})}`;
+          }
+        )
+        // Self closing
+        .replace(
+          /<([\w._-]+)-af-sock-\d+-(\w+)(.*?)\/>/g,
+          (_match, el, encoded, attrs) => {
+            const { sock, repeat } = decode(encoded);
+            const repeatArg = repeat ? `, "${repeat}"` : "";
+            // Handle sockets for child views
+            if (el.startsWith("af-view-")) {
+              el = decode(el.slice(8)).name;
+              return `{proxy("${sock}", (props, T=${
+                this.viewPath
+              }.${el}) => <T ${mergeProps(
                 attrs
-              )}>{createScope(props.children, proxy => <>${bindJSX(
-                content,
-                viewPath
-              )}</>)}</T>${repeatArg})}`
-            : `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
-                attrs
-              )}>{props.children ? props.children : <>${content}</>}</T>${repeatArg})}`;
-        }
-      )
-      // Self closing
-      .replace(
-        /<([\w._-]+)-af-sock-\d+-(\w+)(.*?)\/>/g,
-        (_match, el, encoded, attrs) => {
-          const { sock, repeat } = decode(encoded);
-          const repeatArg = repeat ? `, "${repeat}"` : "";
-          // Handle sockets for child views
-          if (el.startsWith("af-view-")) {
-            el = decode(el.slice(8)).name;
-            return `{proxy("${sock}", (props, T=${viewPath}.${el}) => <T ${mergeProps(
+              )}>{props.children}</T>${repeatArg})}`;
+            }
+            return `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
               attrs
             )}>{props.children}</T>${repeatArg})}`;
           }
-          return `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
-            attrs
-          )}>{props.children}</T>${repeatArg})}`;
-        }
-      )
-      // Decode non-socket child views
-      .replace(/<af-view-(\w+)(.*?)\/>/g, (_match, encoded) => {
-        return `<${viewPath}.${decode(encoded).name}/>`;
-      })
-  );
+        )
+        // Decode non-socket child views
+        .replace(/<af-view-(\w+)(.*?)\/>/g, (_match, encoded) => {
+          return `<${this.viewPath}.${decode(encoded).name}/>`;
+        })
+    );
+  }
 }
 
 // Merge props along with class name
