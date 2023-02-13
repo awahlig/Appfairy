@@ -516,7 +516,7 @@ class ViewWriter extends Writer {
       headHook = `const loaded = useHead(${viewPath}.scripts, ${viewPath}.styles);`;
       fallback = freeText(`
       if (!loaded) {
-        return props.fallback;
+        return props.fallback || null;
       }
     `);
     }
