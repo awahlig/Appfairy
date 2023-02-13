@@ -528,7 +528,10 @@ class ViewWriter extends Writer {
     ].filter(Boolean);
 
     const decl = [
-      `${viewPath}.sock = ${socks};`,
+      [
+        `${viewPath}.displayName = "${viewPath}";`,
+        `${viewPath}.sock = ${socks};`,
+      ].join("\n"),
       scripts,
       styles,
       ...this[_].children.map((child) => {

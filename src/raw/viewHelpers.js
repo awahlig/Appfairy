@@ -39,16 +39,20 @@ const transformProxies = (children = []) => {
 
   React.Children.forEach(children, (child) => {
     const { "af-sock": sock, ...props } = child.props;
+    const type = child.type;
 
     const name = typeof sock === "object" ? sock[""] : sock;
     if (!name) {
-      const tag = child.type.name || child.type;
-      throw new ProxyError(`: missing af-sock= on <${tag}>`);
+      const tag =
+        typeof type === "string"
+          ? type
+          : type.displayName || type.name || "Component";
+      throw new ProxyError(`: missing af-sock= on <${tag}> proxy`);
     }
 
     Object.defineProperties(props, {
       _name: { value: name, writable: false },
-      _type: { value: child.type, writable: false },
+      _type: { value: type, writable: false },
       _used: { value: false, writable: true },
     });
 
