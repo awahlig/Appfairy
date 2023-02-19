@@ -86,14 +86,6 @@ class ViewWriter extends Writer {
     this[_].encapsulateCSS = !!encapsulateCSS;
   }
 
-  get parent() {
-    return this[_].parent;
-  }
-
-  set parent(parent) {
-    this[_].parent = parent;
-  }
-
   get folder() {
     return this[_].folder;
   }
@@ -110,10 +102,6 @@ class ViewWriter extends Writer {
     this[_].baseUrl = String(baseUrl);
   }
 
-  get children() {
-    return this[_].children.slice();
-  }
-
   set name(name) {
     if (!isNaN(Number(name))) {
       name = statuses[name];
@@ -121,8 +109,15 @@ class ViewWriter extends Writer {
 
     const words = splitWords(name);
 
+    const camelCase = (words) => [
+      ...words.slice(0, 1).map((w) => w.toLowerCase()),
+      ...words.slice(1).map(upperFirst),
+    ];
+
     Object.assign(this[_], {
       viewName: words.concat("view").map(upperFirst).join(""),
+      sockName: camelCase(words.concat("sock")).join(""),
+      sockNamespace: camelCase(words).join(""),
       name: words.map((word) => word.toLowerCase()).join("-"),
     });
   }
@@ -135,22 +130,20 @@ class ViewWriter extends Writer {
     return this[_].viewName;
   }
 
-  get viewPath() {
-    const viewNames = [];
-    for (let writer = this; writer; writer = writer.parent) {
-      viewNames.push(writer.viewName);
-    }
-    return viewNames.reverse().join(".");
+  get sockName() {
+    return this[_].sockName;
+  }
+
+  get sockNamespace() {
+    return this[_].sockNamespace;
   }
 
   set html(html) {
     if (!html) {
       this[_].html = "";
-      this[_].children = [];
       return;
     }
 
-    const children = (this[_].children = []);
     const $ = cheerio.load(html);
 
     // Encapsulate styles
@@ -207,56 +200,7 @@ class ViewWriter extends Writer {
       }
     });
 
-    let el = $("[af-view]")[0];
-
-    while (el) {
-      const $el = $(el);
-      const name = $el.attr("af-view");
-      let $view = $("<div/>");
-
-      for (const name of ["af-sock", "af-repeat"]) {
-        $view.attr(name, $el.attr(name));
-        $el.attr(name, null);
-      }
-      $el.attr("af-view", null);
-
-      // Provide a default socket if none has been defined
-      if (!$view.attr("af-sock")) {
-        $view.attr("af-sock", name);
-      }
-
-      // Pluck the view html and replace with a placeholder
-      $view = $view.insertAfter($el);
-      $el.remove();
-
-      if (!/^[a-z_-][0-9a-z_-]*$/i.test(name)) {
-        throw `error: invalid af-view="${name}" in view ${this.viewPath}`;
-      }
-
-      const child = new ViewWriter({
-        name,
-        html: $.html($el),
-        source: this.source,
-        baseUrl: this.baseUrl,
-        encapsulateCSS: this.encapsulateCSS,
-        parent: this,
-      });
-
-      if (
-        children.find((viewWriter) => viewWriter.viewName === child.viewName)
-      ) {
-        throw `error: view ${child.viewPath} already exists`;
-      }
-
-      const data = { name: child.viewName };
-      const encoded = base32.encode(JSON.stringify(data));
-      $view[0].name = `af-view-${encoded}`; // replace "div"
-
-      children.push(child);
-      el = $("[af-view]")[0];
-    }
-
-    // Apply ignore rules AFTER child elements were plucked
+    // Apply ignore rules
     $("[af-ignore]").remove();
     // Empty inner HTML
     $("[af-empty]").html("").attr("af-empty", null);
@@ -304,66 +248,60 @@ class ViewWriter extends Writer {
 
     this[_].html = html;
 
+    // af-view -> af-sock
+    $("[af-view]").each((_, el) => {
+      const $el = $(el);
+      const name = $el.attr("af-view");
+      if (!$el.attr("af-sock")) {
+        $el.attr("af-sock", name);
+      }
+      $el.attr("af-view", null);
+    });
+
     const sockets = (this[_].sockets = {});
 
     const getSockParents = ($el) =>
       $el.parents("[af-sock]").toArray().reverse();
 
-    const getSockNamespace = ($el) =>
-      getSockParents($el).map((el) => $(el).attr("af-sock"));
-
-    // Validate the "af-sock" and "af-repeat" attributes
+    // Validate the "af-sock" attribute
     $("[af-sock]").each((_, el) => {
       const $el = $(el);
       const sock = $el.attr("af-sock").trim();
-      const repeat = ($el.attr("af-repeat") || "").trim();
 
       if (!sock) {
         // Empty - ignore
         $el.attr("af-sock", null);
-        $el.attr("af-repeat", null);
         return;
       }
 
       if (!/^[a-z_-][0-9a-z_-]*$/i.test(sock)) {
-        const ns = getSockNamespace($el).join(".");
-        throw `error: invalid af-sock="${sock}" under "${ns}" in view ${this.viewPath}`;
+        const socks = getSockParents($el).map((el) => $(el).attr("af-sock"));
+        const ns = [this.sockNamespace, ...socks].join(".");
+        throw `error: invalid af-sock="${sock}" under "${ns}"`;
       }
 
       const words = splitWords(sock);
       const normSock = [
-        words.slice(0, 1),
+        ...words.slice(0, 1).map((w) => w.toLowerCase()),
         ...words.slice(1).map(upperFirst),
       ].join("");
 
-      if (!/^[?*+!]?$/.test(repeat)) {
-        const sockPath = getSockNamespace($el).concat(normSock).join(".");
-        throw `error: invalid af-repeat="${repeat}" for socket "${sockPath}" in view ${this.viewPath}`;
-      }
-
       $el.attr("af-sock", normSock);
-      $el.attr("af-repeat", repeat);
     });
 
     // Build the socket tree and encode socket data into the tag name
     $("[af-sock]").each((i, el) => {
       const $el = $(el);
       const sock = $el.attr("af-sock");
-      const repeat = $el.attr("af-repeat");
-
       let type = $el[0].name;
-      if (type.startsWith("af-view-")) {
-        const viewData = JSON.parse(base32.decode(type.slice(8)));
-        type = viewData.name;
-      }
 
       const group = getSockParents($el).reduce(
         (acc, el) => acc[$(el).attr("af-sock")].sockets,
         sockets
       );
-      group[sock] = { type, repeat, sockets: {} };
+      group[sock] = { type, sockets: {} };
 
-      const data = { sock, repeat };
+      const data = { sock };
       const encoded = base32.encode(JSON.stringify(data));
       el.tagName += `-af-sock-${i}-${encoded}`;
     });
@@ -373,14 +311,16 @@ class ViewWriter extends Writer {
 
     // Remove af- attributes
     removeAttr("af-sock");
+    // Legacy
     removeAttr("af-repeat");
+    removeAttr("af-el");
 
     // Refetch modified html
     html = $body.html();
 
     // Transforming HTML into JSX
     let jsx = htmltojsx.convert(html).trim();
-    // Bind sockets and child views
+    // Bind sockets
     this[_].jsx = this[_].bindJSX(jsx);
   }
 
@@ -427,7 +367,6 @@ class ViewWriter extends Writer {
   constructor(options) {
     super();
 
-    this[_].children = [];
     this[_].styles = options.styles || [];
     this[_].wfData = new Map();
 
@@ -436,7 +375,6 @@ class ViewWriter extends Writer {
     this.folder = options.folder || "";
     this.baseUrl = options.baseUrl;
     this.encapsulateCSS = options.encapsulateCSS;
-    this.parent = options.parent;
 
     this.html = options.html;
   }
@@ -470,143 +408,75 @@ class ViewWriter extends Writer {
   _compose() {
     return freeLint(`
       import { useEffect } from "react";
-      import { useHead, createScope, join } from "${this[_].importPath(
+      import { View, Hatch, defineSock } from "${this[_].importPath(
         "./helpers"
       )}";
 
-      /*
-        ==>${this[_].composeViewArray().join("\n")}<==
-      */
-
-      ==>${this[_].composeViews("export const ")}<==
-
-      export const sock = ${this.viewName}.sock;
-      export default ${this.viewName};
+      ==>${this[_].composeView("export const ")}<==
     `);
   }
 
-  _composeViewArray() {
-    return [
-      this.viewPath,
-      ...this[_].children.map((child) => child[_].composeViewArray()).flat(),
-    ];
-  }
+  _composeView(prefix = "") {
+    const viewName = this.viewName;
 
-  _composeViews(prefix = "") {
-    const viewPath = this.viewPath;
+    const args = [
+      `namespace={${this.sockName}}`,
+      "content={props.children}",
+      "fallback={props.fallback}",
+      "scripts={scripts}",
+      "styles={styles}",
+    ];
 
     const render = freeText(`
-      return createScope(props.children, proxy =>
-        ==>${this.jsx}<==
+      return (
+        <View ${args.join(" ")}>
+          ==>${this.jsx}<==
+        </View>
       );
     `);
 
-    const docstring = this[_].composeDocstring();
     const socks = this[_].composeSocks();
     const scripts = this[_].composeScripts();
     const styles = this[_].composeStyles();
 
-    const comment = [viewPath, "-".repeat(viewPath.length), docstring].filter(
-      Boolean
-    );
-
-    let headHook = "";
-    let fallback = "";
-    if (scripts || styles) {
-      headHook = `const loaded = useHead(${viewPath}.scripts, ${viewPath}.styles);`;
-      fallback = freeText(`
-      if (!loaded) {
-        return props.fallback || null;
-      }
-    `);
-    }
-
-    const body = [
-      headHook,
-      this[_].composeEffects(),
-      [fallback, render].filter(Boolean).join("\n"),
-    ].filter(Boolean);
+    const body = [this[_].composeEffects(), render].filter(Boolean);
 
     const decl = [
-      [
-        `${viewPath}.displayName = "${viewPath}";`,
-        `${viewPath}.sock = ${socks};`,
-      ].join("\n"),
+      socks,
       scripts,
       styles,
-      ...this[_].children.map((child) => {
-        return child[_].composeViews();
-      }),
     ].filter(Boolean);
 
     return freeText(`
-      /**
-        ==>${comment.join("\n")}<==
-      */
-      ${prefix}${viewPath} = (props) => {
+      ==>${decl.join("\n\n")}<==
+
+      ${prefix}${viewName} = (props) => {
         ==>${body.join("\n\n")}<==
       };
-
-      ==>${decl.join("\n\n")}<==
     `);
-  }
-
-  _composeDocstring() {
-    if (Object.keys(this[_].sockets).length === 0) {
-      return "";
-    }
-
-    const collect = (sockets, sockPath = "sock") =>
-      Object.entries(sockets)
-        .map(([socketName, props]) => {
-          const ident = `${sockPath}.${socketName}`;
-          const comment = props.repeat
-            ? `// af-repeat="${props.repeat}"\n`
-            : "";
-          if (Object.keys(props.sockets).length === 0) {
-            return `${comment}<${props.type} af-sock={${ident}} />`;
-          }
-          const text =
-            comment +
-            freeText(`
-          <${props.type} af-sock={${ident}}>
-            ==>${collect(props.sockets, ident)}<==
-          </${props.type}>
-        `);
-          return `\n${text}\n`;
-        })
-        .join("\n");
-
-    const hints = collect(this[_].sockets)
-      .trim()
-      .replace(/\n\n\n/g, "\n\n");
-    return `\`\`\`\n${hints}\n\`\`\``;
   }
 
   _composeSocks() {
-    if (Object.keys(this[_].sockets).length === 0) {
-      return "Object.freeze({})";
-    }
-
     const collect = (sockets) =>
       Object.entries(sockets)
         .map(([socketName, props]) => {
+          const comment = `<${props.type}>`;
           if (Object.keys(props.sockets).length === 0) {
-            return `${socketName}: "${socketName}",`;
+            return `${socketName}: null, // ${comment}`;
           }
           return freeText(`
-          ${socketName}: Object.freeze({ "": "${socketName}",
-            ==>${collect(props.sockets)}<==
-          }),
-        `);
+            ${socketName}: { // ${comment}
+              ==>${collect(props.sockets)}<==
+            },
+          `);
         })
         .join("\n");
 
     return freeText(`
-        Object.freeze({
-          ==>${collect(this[_].sockets)}<==
-        })
-      `);
+      export const ${this.sockName} = defineSock("${this.sockNamespace}", {
+        ==>${collect(this[_].sockets)}<==
+      })
+    `);
   }
 
   _composeEffects() {
@@ -640,10 +510,8 @@ class ViewWriter extends Writer {
       return `{ ${text} },`;
     });
 
-    if (content.length === 0) return "";
-
     return freeText(`
-      ${this.viewPath}.scripts = Object.freeze([
+      export const scripts = Object.freeze([
         ==>${content.join("\n")}<==
       ]);
     `);
@@ -666,10 +534,8 @@ class ViewWriter extends Writer {
       return `{ ${text} },`;
     });
 
-    if (content.length === 0) return "";
-
     return freeText(`
-      ${this.viewPath}.styles = Object.freeze([
+      export const styles = Object.freeze([
         ==>${content.join("\n")}<==
       ]);
     `);
@@ -704,61 +570,24 @@ class ViewWriter extends Writer {
         .replace(
           /<([\w._-]+)-af-sock-(\d+)-(\w+)(.*?)>([^]*)<\/\1-af-sock-\2-\3>/g,
           (_match, el, _index, encoded, attrs, content) => {
-            const { sock, repeat } = decode(encoded);
-            const repeatArg = repeat ? `, "${repeat}"` : "";
-            // If there are nested sockets
-            return /<[\w._-]+-af-sock-\d+-\w+/.test(content)
-              ? `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
-                  attrs
-                )}>{createScope(props.children, proxy => <>${this[_].bindJSX(
-                  content
-                )}</>)}</T>${repeatArg})}`
-              : `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
-                  attrs
-                )}>{props.children || <>${content}</>}</T>${repeatArg})}`;
+            const { sock } = decode(encoded);
+            const elAndAttrs = `${el} ${attrs.trimStart()}`.trimEnd();
+            return `<Hatch sock="${sock}"><${elAndAttrs}>${this[
+              _
+            ].bindJSX(content)}</${el}></Hatch>`;
           }
         )
         // Self closing
         .replace(
           /<([\w._-]+)-af-sock-\d+-(\w+)(.*?)\/>/g,
           (_match, el, encoded, attrs) => {
-            const { sock, repeat } = decode(encoded);
-            const repeatArg = repeat ? `, "${repeat}"` : "";
-            // Handle sockets for child views
-            if (el.startsWith("af-view-")) {
-              el = decode(el.slice(8)).name;
-              return `{proxy("${sock}", (props, T=${
-                this.viewPath
-              }.${el}) => <T ${mergeProps(
-                attrs
-              )}>{props.children}</T>${repeatArg})}`;
-            }
-            return `{proxy("${sock}", (props, T="${el}") => <T ${mergeProps(
-              attrs
-            )}>{props.children}</T>${repeatArg})}`;
+            const { sock } = decode(encoded);
+            const elAndAttrs = `${el} ${attrs.trimStart()}`.trimEnd();
+            return `<Hatch sock="${sock}"><${elAndAttrs} /></Hatch>`;
           }
         )
-        // Decode non-socket child views
-        .replace(/<af-view-(\w+)(.*?)\/>/g, (_match, encoded) => {
-          return `<${this.viewPath}.${decode(encoded).name}/>`;
-        })
     );
   }
-}
-
-// Merge props along with class name
-function mergeProps(attrs) {
-  attrs = `${attrs.trimEnd()} {...props}`;
-
-  let className = attrs.match(/className="([^"]+)"/);
-  if (!className) {
-    return attrs.trimStart();
-  }
-
-  className = className[1];
-  attrs = attrs.replace(/ ?className="[^"]+"/, "");
-
-  return `${attrs} className={join("${className}", props.className)}`.trimStart();
 }
 
 export default ViewWriter;

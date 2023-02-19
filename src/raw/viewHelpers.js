@@ -2,6 +2,7 @@
 /* eslint-disable */
 
 import React from "react";
+
 import { loadScripts } from "../scripts/helpers";
 import { loadStyles } from "../styles/helpers";
 
@@ -12,7 +13,25 @@ export class ProxyError extends Error {
   }
 }
 
-export const useHead = (scripts = [], styles = []) => {
+const defaultViewContext = Object.freeze({
+  hatch: "",
+  namespace: "",
+  template: null,
+  proxies: null,
+  used: null,
+  parent: null,
+});
+
+const ViewContext = React.createContext(defaultViewContext);
+
+export const View = ({
+  namespace,
+  content,
+  scripts,
+  styles,
+  fallback,
+  children,
+}) => {
   const [loaded, setLoaded] = React.useState(false);
 
   React.useEffect(() => {
@@ -29,99 +48,210 @@ export const useHead = (scripts = [], styles = []) => {
     }
   }, [loaded]);
 
-  return loaded;
+  const context = {
+    ...defaultViewContext,
+    namespace: resolveSock(namespace),
+    template: children,
+  };
+
+  return loaded ? (
+    <ViewContext.Provider value={context}>{content}</ViewContext.Provider>
+  ) : (
+    <>{fallback}</>
+  );
 };
 
-const transformProxies = (children = []) => {
-  children = [].concat(children).filter(Boolean);
+export const Render = (props) => {
+  const context = React.useContext(ViewContext);
+  const namespace = resolveSock(props.namespace) || context.namespace;
 
-  const proxies = {};
+  const spec = React.useMemo(() => {
+    const spec = {};
+    React.Children.forEach(props.children, (child) => {
+      if (child) {
+        const item = transformProxy(child, namespace);
 
-  React.Children.forEach(children, (child) => {
-    const { "af-sock": sock, ...props } = child.props;
-    const type = child.type;
-
-    const name = typeof sock === "object" ? sock[""] : sock;
-    if (!name) {
-      const tag =
-        typeof type === "string"
-          ? type
-          : type.displayName || type.name || "Component";
-      throw new ProxyError(`: missing af-sock= on <${tag}> proxy`);
-    }
-
-    Object.defineProperties(props, {
-      _name: { value: name, writable: false },
-      _type: { value: type, writable: false },
-      _used: { value: false, writable: true },
+        if (!spec[item.sock]) spec[item.sock] = [item];
+        else spec[item.sock].push(item);
+      }
     });
+    return spec;
+  }, [props.children, namespace]);
 
-    if (child.key != null) {
-      props.key = child.key;
+  const used = React.useRef({});
+  const keys = React.useMemo(() => Object.keys(spec), [spec]);
+
+  React.useEffect(() => {
+    for (const sock of keys) {
+      if (!used.current[sock]) {
+        console.warn(`${namespace}: unused proxy "${sock}"`);
+      }
     }
+  }, [keys, namespace]);
 
-    if (child.ref != null) {
-      props.ref = child.ref;
-    }
+  const innerContext = {
+    ...defaultViewContext,
+    namespace,
+    proxies: spec,
+    used: used.current,
+    parent: context,
+  };
 
-    if (!proxies[name]) {
-      proxies[name] = props;
-    } else if (!(proxies[name] instanceof Array)) {
-      proxies[name] = [proxies[name], props];
-    } else {
-      proxies[name].push(props);
-    }
-  });
-
-  return proxies;
+  return (
+    <ViewContext.Provider value={innerContext}>
+      {context.template}
+    </ViewContext.Provider>
+  );
 };
 
-export const createScope = (children, callback) => {
-  const proxies = transformProxies(children);
+export const Hatch = (props) => {
+  const context = React.useContext(ViewContext);
+  const key = `${context.namespace}.${props.sock}`;
+  const template = props.children; // single
 
-  const result = callback((name, callback, repeat = "") => {
-    const props = proxies[name];
+  const proxies = findProxies(context, props.sock);
 
-    const call = (props) => {
-      try {
-        return callback(props, props._type);
-      } catch (err) {
-        if (err instanceof ProxyError) {
-          // reconstruct namespace for proxy errors
-          throw new ProxyError(`${name}.${err.message}`);
+  const rendered = proxies
+    ?.map((item) => renderProxy(item, template))
+    .filter(Boolean);
+
+  const nextContext = {
+    ...defaultViewContext,
+    hatch: props.sock,
+    namespace: key,
+    template: template.props.children,
+    parent: context,
+  };
+
+  return (
+    <ViewContext.Provider value={nextContext}>
+      {rendered?.length === 1 ? rendered[0] : rendered || template}
+    </ViewContext.Provider>
+  );
+};
+
+export const Proxy = () => {
+  throw new ProxyError("<Proxy> can only be used in <Render>");
+};
+
+function transformProxy(proxy, ns) {
+  if (!React.isValidElement(proxy) || proxy.type !== Proxy) {
+    throw new ProxyError(`${ns}: <Render> can only contain <Proxy>`);
+  }
+
+  const item = {
+    ...proxy.props,
+    sock: resolveSock(proxy.props.sock),
+    key: proxy.key,
+  };
+  if (!item.sock) {
+    throw new ProxyError(`${ns}: missing sock= on <Proxy>`);
+  }
+
+  const p = `<Proxy sock="${item.sock}">`;
+  if (!item.sock.startsWith(`${ns}.`)) {
+    throw new ProxyError(`${p} is not valid in "${ns}" namespace`);
+  }
+  item.sock = item.sock.slice(ns.length + 1);
+
+  if (item.element && !React.isValidElement(item.element)) {
+    throw new ProxyError(`element= on ${p} must be an element`);
+  }
+
+  if (item.text && typeof item.text !== "string") {
+    throw new ProxyError(`text= on ${p} must be a string`);
+  }
+
+  item.content = item.children || item.element || item.text || null;
+
+  if (item.merge && item.content && !React.isValidElement(item.content)) {
+    throw new Error(`${p} merge mode requires a single child element`);
+  }
+
+  return item;
+}
+
+function findProxies(context, sock) {
+  while (context) {
+    if (context.proxies) {
+      const proxies = context.proxies[sock];
+      if (proxies) {
+        if (context.used) {
+          context.used[sock] = true;
         }
-        throw err;
+        return proxies;
       }
-    };
-
-    // no proxy
-    if (!props) {
-      if (repeat === "!") {
-        throw new ProxyError(`${name}: required proxy not found`);
-      }
-      if (/^[?*]$/.test(repeat)) return null;
-      return call({});
     }
-
-    // mark proxy as recognised
-    (props instanceof Array ? props : [props])[0]._used = true;
-
-    // single proxy
-    if (!(props instanceof Array)) return call(props);
-    // 2 or more proxies
-    if (/^[+*]$/.test(repeat)) return props.map(call);
-
-    throw new ProxyError(`${name}: too many proxies (${props.length})`);
-  });
-
-  // check for unrecognised proxies
-  Object.entries(proxies).forEach(([name, props]) => {
-    if (!(props instanceof Array ? props : [props])[0]._used) {
-      throw new ProxyError(`${name}: unrecognised proxy`);
+    if (context.hatch) {
+      sock = `${context.hatch}.${sock}`;
     }
-  });
+    context = context.parent;
+  }
+  return null;
+}
 
-  return result;
+function renderProxy(item, template) {
+  const proxy = item.content;
+
+  if (item.replace) {
+    // replace everything with the proxy
+    return proxy;
+  } else if (!item.merge) {
+    // place proxy inside template element
+    return (
+      <template.type
+        {...mergeProps(template.props, item.key ? { key: item.key } : null, {
+          children: proxy,
+        })}
+      />
+    );
+  } else if (React.isValidElement(proxy)) {
+    // merge proxy element with template element
+    return (
+      <proxy.type
+        {...mergeProps(
+          template.props,
+          item.key ? { key: item.key } : null,
+          proxy.props,
+          proxy.key ? { key: proxy.key } : null,
+          proxy.ref ? { ref: proxy.ref } : null
+        )}
+      />
+    );
+  } else {
+    // merge null - return just the template
+    return (
+      <template.type
+        {...mergeProps(template.props, item.key ? { key: item.key } : null)}
+      />
+    );
+  }
+}
+
+const mergeProps = (...props) => {
+  const out = props.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+  if (out.className) {
+    out.className = props
+      .map((curr) => curr?.className)
+      .filter(Boolean)
+      .join(" ");
+  }
+  return out;
 };
 
-export const join = (...args) => args.filter(Boolean).join(" ");
+export function defineSock(name, spec) {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(spec)
+        .map(([k, v]) => {
+          const fn = `${name}.${k}`;
+          return [k, v ? defineSock(fn, v) : fn];
+        })
+        .concat([["", name]])
+    )
+  );
+}
+
+export function resolveSock(sock) {
+  return sock ? (typeof sock === "string" ? sock : sock[""]) : "";
+}
