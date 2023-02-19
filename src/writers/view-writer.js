@@ -55,22 +55,45 @@ class ViewWriter extends Writer {
             return a < b ? -1 : a > b ? 1 : 0;
           })
           .map(
-            (viewWriter) =>
-              `export { ${viewWriter.viewName} } from "./${viewWriter.viewName}";`
-          )
-          .join("\n");
+            (view) =>
+              `export { ${view.viewName}, ${view.sockName} } from "./${view.viewName}";`
+          );
+
+        const importPath = (name) => {
+          const result = path.relative(folder, name).replace(/\\/g, "/");
+          return result.startsWith(".") ? result : `./${result}`;
+        };
+
+        index.push(
+          `\nexport { Render, Proxy, defineSock } from "${importPath(
+            "./helpers"
+          )}";`
+        );
 
         const indexFilePath = `${dir}/${folder}/index.js`;
         await mkdirp(path.dirname(indexFilePath));
-        await fs.writeFile(indexFilePath, freeLint(index));
-        outputFiles.push(indexFilePath);
+        await fs.writeFile(indexFilePath, freeLint(index.join("\n")));
+
+        index.pop();
+        index.push(
+          `\nexport { Render, Proxy, defineSock, Sock } from "${importPath(
+            "./helpers"
+          )}";`
+        );
+
+        const indexDtsFilePath = `${dir}/${folder}/index.d.ts`;
+        await fs.writeFile(indexDtsFilePath, freeLint(index.join("\n")));
+
+        outputFiles.push(indexFilePath, indexDtsFilePath);
       }
     );
 
     const writingHelpers = (async () => {
       const helpersFilePath = `${dir}/helpers.js`;
+      const helpersDtsFilePath = `${dir}/helpers.d.ts`;
       await fs.writeFile(helpersFilePath, raw.viewHelpers);
-      outputFiles.push(helpersFilePath);
+      await fs.writeFile(helpersDtsFilePath, raw.viewHelpersDts);
+      outputFiles.push(helpersFilePath, helpersDtsFilePath);
     })();
 
     await Promise.all([...writingViews, ...writingIndices, writingHelpers]);

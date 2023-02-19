@@ -16,4 +16,8 @@ export default {
   get viewHelpers() {
     return requireText(resolve("viewHelpers.js"));
   },
+
+  get viewHelpersDts() {
+    return requireText(resolve("viewHelpers.d.ts"));
+  },
 };
