@@ -316,13 +316,26 @@ class ViewWriter extends Writer {
     $("[af-sock]").each((i, el) => {
       const $el = $(el);
       const sock = $el.attr("af-sock");
-      let type = $el[0].name;
+
+      // build the comment describing the socket element
+      const $cl = cheerio.load(cheerio.html(el))("body *").first();
+      $cl.text($cl.contents().length > 0 ? "\u2026" : "");
+      Object.keys($cl[0].attribs || {})
+        .filter((attr) => attr.startsWith("af-"))
+        .forEach((attr) => $cl.attr(attr, null));
+      const jsx = htmltojsx
+        .convert(cheerio.html($cl))
+        .trim()
+        // add newlines between attributes
+        .replace(/\s+([\w-]+(="[^"]*"|={[^}]+}|(?=[ >])))/g, "\n$1");
+      const indent = " ".repeat(jsx.indexOf("\n") + 1);
+      const desc = jsx.replace("\n", " ").replace(/\n/g, `\n${indent}`);
 
       const group = getSockParents($el).reduce(
         (acc, el) => acc[$(el).attr("af-sock")].sockets,
         sockets
       );
-      group[sock] = { type, sockets: {} };
+      group[sock] = { desc, sockets: {} };
 
       const data = { sock };
       const encoded = base32.encode(JSON.stringify(data));
@@ -464,11 +477,7 @@ class ViewWriter extends Writer {
 
     const body = [this[_].composeEffects(), render].filter(Boolean);
 
-    const decl = [
-      socks,
-      scripts,
-      styles,
-    ].filter(Boolean);
+    const decl = [socks, scripts, styles].filter(Boolean);
 
     return freeText(`
       ==>${decl.join("\n\n")}<==
@@ -483,15 +492,19 @@ class ViewWriter extends Writer {
     const collect = (sockets) =>
       Object.entries(sockets)
         .map(([socketName, props]) => {
-          const comment = `<${props.type}>`;
           if (Object.keys(props.sockets).length === 0) {
-            return `${socketName}: null, // ${comment}`;
+            return freeText(`
+              ${socketName}: /*
+                ==>${props.desc} */ null,<==
+            `);
+          } else {
+            return freeText(`
+              ${socketName}: /*
+                ==>${props.desc} */ {<==
+                ==>${collect(props.sockets)}<==
+              },
+            `);
           }
-          return freeText(`
-            ${socketName}: { // ${comment}
-              ==>${collect(props.sockets)}<==
-            },
-          `);
         })
         .join("\n");
 
@@ -595,9 +608,9 @@ class ViewWriter extends Writer {
           (_match, el, _index, encoded, attrs, content) => {
             const { sock } = decode(encoded);
             const elAndAttrs = `${el} ${attrs.trimStart()}`.trimEnd();
-            return `<Hatch sock="${sock}"><${elAndAttrs}>${this[
-              _
-            ].bindJSX(content)}</${el}></Hatch>`;
+            return `<Hatch sock="${sock}"><${elAndAttrs}>${this[_].bindJSX(
+              content
+            )}</${el}></Hatch>`;
           }
         )
         // Self closing
