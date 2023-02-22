@@ -150,10 +150,10 @@ function transformProxy(proxy, ns) {
   }
 
   const p = `<Proxy sock="${item.sock}">`;
-  if (!item.sock.startsWith(`${ns}.`)) {
+  item.sock = relativeSock(item.sock, ns) || relativeSock(item.sock, "");
+  if (!item.sock) {
     throw new ProxyError(`${p} is not valid in "${ns}" namespace`);
   }
-  item.sock = item.sock.slice(ns.length + 1);
 
   if (item.element && !React.isValidElement(item.element)) {
     throw new ProxyError(`element= on ${p} must be an element`);
@@ -255,4 +255,8 @@ export function defineSock(name, spec) {
 
 export function resolveSock(sock) {
   return sock ? (typeof sock === "string" ? sock : sock[""]) : "";
+}
+
+function relativeSock(sock, ns) {
+  return sock.startsWith(`${ns}.`) ? sock.slice(ns.length + 1) : "";
 }
