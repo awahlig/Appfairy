@@ -92,6 +92,7 @@ export const Render = (props) => {
   const innerContext = {
     ...defaultViewContext,
     namespace,
+    template: props.element ? context.template : null,
     proxies: spec,
     used: used.current,
     parent: context,
@@ -99,7 +100,7 @@ export const Render = (props) => {
 
   return (
     <ViewContext.Provider value={innerContext}>
-      {context.template}
+      {props.element || context.template}
     </ViewContext.Provider>
   );
 };

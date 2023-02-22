@@ -50,8 +50,14 @@ export function resolveSock(sock: AnySock): string;
  *
  * The optional namespace prop sets a new namespace for the socks.
  * Use it when working with sock trees created using defineSock().
+ *
+ * If element prop is provided, the element will be rendered
+ * instead of the template. This allows Render to be used to
+ * add proxies without consuming the template.
  */
-export const Render: React.FC<React.PropsWithChildren<{ namespace?: AnySock }>>;
+export const Render: React.FC<
+  React.PropsWithChildren<{ namespace?: AnySock; element?: React.ReactElement }>
+>;
 
 /**
  * Use directly inside `<Render>` to access a socket.
