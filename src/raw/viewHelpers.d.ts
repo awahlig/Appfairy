@@ -63,14 +63,15 @@ export const Render: React.FC<
  * Use directly inside `<Render>` to access a socket.
  *
  * `<Proxy sock={}>...</Proxy>`
- * - Overrides the content of the socket element.
+ * - Sets the content of the socket element.
  *
  * `<Proxy sock={} replace>...</Proxy>`
- * - Overrides the entire socket element and its content.
+ * - Replaces the entire socket element and its content.
+ * - Use with no content to remove the element.
  *
  * `<Proxy sock={} merge><div>...</div></Proxy>`
- * - Merges the socket element with the <div>.
- * - Merging means overriding the type, individual attributes
+ * - Merges the socket element with the provided element.
+ * - Merging means overriding the type, adding/overriding attributes
  *   and/or content.
  *
  * `<Proxy sock={} element={<div/>} />`
@@ -78,12 +79,13 @@ export const Render: React.FC<
  *
  * `<Proxy sock={} text="text" />`
  * - Same as `<Proxy sock={}>text</Proxy>`
+ * - Works with numbers too.
  *
- * Use multiple times to duplicate the socket as siblings to populate
- * lists.
+ * If no proxy is provided for a socket, the socket element
+ * is rendered unchanged.
  *
- * If no proxy is provided f socket, the socket element is
- * rendered unmodified.
+ * If multiple proxies are provided for a socket, the socket
+ * element is rendered multiple times as siblings.
  */
 export const Proxy: React.FC<
   React.PropsWithChildren<{
@@ -91,6 +93,6 @@ export const Proxy: React.FC<
     merge?: boolean;
     replace?: boolean;
     element?: React.ReactElement;
-    text?: string;
+    text?: string | number;
   }>
 >;

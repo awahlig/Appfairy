@@ -89,7 +89,7 @@ export const Render = (props) => {
     }
   }, [keys, namespace]);
 
-  const innerContext = {
+  const childContext = {
     ...defaultViewContext,
     namespace,
     template: props.element ? context.template : null,
@@ -99,7 +99,7 @@ export const Render = (props) => {
   };
 
   return (
-    <ViewContext.Provider value={innerContext}>
+    <ViewContext.Provider value={childContext}>
       {props.element || context.template}
     </ViewContext.Provider>
   );
@@ -116,7 +116,7 @@ export const Hatch = (props) => {
     ?.map((item) => renderProxy(item, template))
     .filter(Boolean);
 
-  const nextContext = {
+  const childContext = {
     ...defaultViewContext,
     hatch: props.sock,
     namespace: key,
@@ -125,7 +125,7 @@ export const Hatch = (props) => {
   };
 
   return (
-    <ViewContext.Provider value={nextContext}>
+    <ViewContext.Provider value={childContext}>
       {rendered?.length === 1 ? rendered[0] : rendered || template}
     </ViewContext.Provider>
   );
@@ -143,6 +143,7 @@ function transformProxy(proxy, ns) {
   const item = {
     ...proxy.props,
     sock: resolveSock(proxy.props.sock),
+    content: proxy.props.children,
     key: proxy.key,
   };
   if (!item.sock) {
@@ -155,18 +156,24 @@ function transformProxy(proxy, ns) {
     throw new ProxyError(`${p} is not valid in "${ns}" namespace`);
   }
 
-  if (item.element && !React.isValidElement(item.element)) {
+  if (["string", "number"].includes(typeof item.text)) {
+    item.content = item.text;
+  } else if (item.text) {
+    throw new ProxyError(`text= on ${p} must be a string or a number`);
+  }
+
+  if (React.isValidElement(item.element)) {
+    item.content = item.element;
+  } else if (item.element) {
     throw new ProxyError(`element= on ${p} must be an element`);
   }
 
-  if (item.text && typeof item.text !== "string") {
-    throw new ProxyError(`text= on ${p} must be a string`);
-  }
-
-  item.content = item.children || item.element || item.text || null;
-
-  if (item.merge && item.content && !React.isValidElement(item.content)) {
-    throw new Error(`${p} merge mode requires a single child element`);
+  if (
+    item.merge &&
+    item.content != null && // coerces undefined
+    !React.isValidElement(item.content)
+  ) {
+    throw new Error(`${p} merge mode requires a single child element or null`);
   }
 
   return item;
