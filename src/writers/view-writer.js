@@ -489,28 +489,38 @@ class ViewWriter extends Writer {
   }
 
   _composeSocks() {
-    const collect = (sockets) =>
+    const collect = (sockets, parent) =>
       Object.entries(sockets)
         .map(([socketName, props]) => {
+          const sockPath = `${parent}.${socketName}`;
+          const comment = props.desc
+            .split("\n")
+            .map((line) => ` * ${line}`)
+            .join("\n")
+            .trimStart();
           if (Object.keys(props.sockets).length === 0) {
             return freeText(`
-              ${socketName}: /*
-                ==>${props.desc} */ null,<==
+              ${socketName}: // ${sockPath}
+                ==>/${comment}<==
+                 */
+                null,
             `);
           } else {
             return freeText(`
-              ${socketName}: /*
-                ==>${props.desc} */ {<==
-                ==>${collect(props.sockets)}<==
-              },
+              ${socketName}: // ${sockPath}
+                ==>/${comment}<==
+                 */
+                {
+                  ==>${collect(props.sockets, sockPath)}<==
+                },
             `);
           }
         })
-        .join("\n");
+        .join("\n\n");
 
     return freeText(`
       export const ${this.sockName} = defineSock("${this.sockNamespace}", {
-        ==>${collect(this[_].sockets)}<==
+        ==>${collect(this[_].sockets, this.sockName)}<==
       })
     `);
   }
