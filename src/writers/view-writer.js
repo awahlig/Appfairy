@@ -65,7 +65,7 @@ class ViewWriter extends Writer {
         };
 
         index.push(
-          `\nexport { Render, Proxy, defineSock } from "${importPath(
+          `\nexport { Render, Plug, Swap, Proxy, defineSock } from "${importPath(
             "./helpers"
           )}";`
         );
@@ -76,7 +76,7 @@ class ViewWriter extends Writer {
 
         index.pop();
         index.push(
-          `\nexport { Render, Proxy, defineSock, Sock } from "${importPath(
+          `\nexport { Render, Plug, Swap, Proxy, defineSock, Sock } from "${importPath(
             "./helpers"
           )}";`
         );

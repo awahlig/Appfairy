@@ -1,6 +1,6 @@
 import React from "react";
 
-export class ProxyError extends Error {}
+export class RenderError extends Error {}
 
 /**
  * Type for a specification of a sock tree.
@@ -35,14 +35,14 @@ export function defineSock<P extends string, T extends SockSpec>(
 export function resolveSock(sock: AnySock): string;
 
 /**
- * Renders the template in a view or a parent proxy.
- * Gives access to sockets using `<Proxy>`-children.
+ * Renders the template in a view or a plug.
+ * Gives access to sockets using `<Plug|Swap|Proxy>`-children.
  *
  * Example:
  * ```
  * <MyView>
  *   <Render> // render the view, look for sockets
- *     <Proxy sock={sock.navbar}> // handle navbar socket
+ *     <Plug sock={sock.navbar}> // handle navbar socket
  *       <Render> // render navbar, look for nested sockets
  *         <Proxy sock={sock.navbar.home}>
  *           ...
@@ -51,48 +51,77 @@ export function resolveSock(sock: AnySock): string;
  * The optional namespace prop sets a new namespace for the socks.
  * Use it when working with sock trees created using defineSock().
  *
- * If element prop is provided, the element will be rendered
+ * When element prop is set, the provided element will be rendered
  * instead of the template. This allows Render to be used to
- * add proxies without consuming the template.
+ * add plugs without consuming the template.
+ *
+ * If no plug is provided for a socket, the socket element is
+ * rendered unchanged.
+ *
+ * If multiple plugs are provided for a socket, the socket element
+ * is rendered multiple times as siblings.
  */
 export const Render: React.FC<
   React.PropsWithChildren<{ namespace?: AnySock; element?: React.ReactElement }>
 >;
 
 /**
- * Use directly inside `<Render>` to access a socket.
+ * Sets the content of a socket element.
  *
- * `<Proxy sock={}>...</Proxy>`
- * - Sets the content of the socket element.
+ * Use with no content to empty the socket element.
  *
- * `<Proxy sock={} replace>...</Proxy>`
- * - Replaces the entire socket element and its content.
- * - Use with no content to remove the element.
+ * `<Plug sock={} />`
+ * `<Plug sock={}>...</Plug>`
+ * `<Plug sock={} element={<div />} />`
+ * `<Plug sock={} text="abc123" />`
  *
- * `<Proxy sock={} merge><div>...</div></Proxy>`
- * - Merges the socket element with the provided element.
- * - Merging means overriding the type, adding/overriding attributes
- *   and/or content.
+ * Only use inside `<Render>`.
+ */
+export const Plug: React.FC<
+  React.PropsWithChildren<{
+    sock: AnySock;
+    element?: React.ReactElement;
+    text?: string | number;
+  }>
+>;
+
+/**
+ * Replaces the entire socket element with the provied content.
  *
- * `<Proxy sock={} element={<div/>} />`
- * - Same as `<Proxy sock={}><div/></Proxy>`
+ * Use with no content to remove the socket element entirely.
  *
- * `<Proxy sock={} text="text" />`
- * - Same as `<Proxy sock={}>text</Proxy>`
- * - Works with numbers too.
+ * `<Swap sock={} />`
+ * `<Swap sock={}>...</Swap>`
+ * `<Swap sock={} element={<div />} />`
+ * `<Swap sock={} text="abc123" />`
  *
- * If no proxy is provided for a socket, the socket element
- * is rendered unchanged.
+ * Only use inside `<Render>`.
+ */
+export const Swap: React.FC<
+  React.PropsWithChildren<{
+    sock: AnySock;
+    element?: React.ReactElement;
+    text?: string | number;
+  }>
+>;
+
+/**
+ * Merges the socket element with the provided proxy.
  *
- * If multiple proxies are provided for a socket, the socket
- * element is rendered multiple times as siblings.
+ * Merging means overriding the type of the socket element,
+ * adding/overriding its attributes and/or content.
+ *
+ * Empty proxy is allowed but has no function.
+ *
+ * `<Proxy sock={} />`
+ * `<Proxy sock={}><div /></Proxy>`
+ * `<Proxy sock={} element={<div />} />`
+ *
+ * Only use inside `<Render>`.
  */
 export const Proxy: React.FC<
   React.PropsWithChildren<{
     sock: AnySock;
-    merge?: boolean;
-    replace?: boolean;
     element?: React.ReactElement;
-    text?: string | number;
   }>
 >;

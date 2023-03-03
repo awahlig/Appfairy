@@ -6,10 +6,10 @@ import React from "react";
 import { loadScripts } from "../scripts/helpers";
 import { loadStyles } from "../styles/helpers";
 
-export class ProxyError extends Error {
+export class RenderError extends Error {
   constructor(message) {
     super(message);
-    this.name = "ProxyError";
+    this.name = "RenderError";
   }
 }
 
@@ -17,7 +17,7 @@ const defaultViewContext = Object.freeze({
   hatch: "",
   namespace: "",
   template: null,
-  proxies: null,
+  plugs: null,
   used: null,
   parent: null,
 });
@@ -65,26 +65,26 @@ export const Render = (props) => {
   const context = React.useContext(ViewContext);
   const namespace = resolveSock(props.namespace) || context.namespace;
 
-  const spec = React.useMemo(() => {
-    const spec = {};
+  const plugs = React.useMemo(() => {
+    const plugs = {};
     React.Children.forEach(props.children, (child) => {
       if (child) {
-        const item = transformProxy(child, namespace);
+        const item = transformPlug(child, namespace);
 
-        if (!spec[item.sock]) spec[item.sock] = [item];
-        else spec[item.sock].push(item);
+        if (!plugs[item.sock]) plugs[item.sock] = [item];
+        else plugs[item.sock].push(item);
       }
     });
-    return spec;
+    return plugs;
   }, [props.children, namespace]);
 
   const used = React.useRef({});
-  const keys = React.useMemo(() => Object.keys(spec), [spec]);
+  const keys = React.useMemo(() => Object.keys(plugs), [plugs]);
 
   React.useEffect(() => {
     for (const sock of keys) {
       if (!used.current[sock]) {
-        console.warn(`${namespace}: unused proxy "${sock}"`);
+        console.warn(`${namespace}: unused plug "${sock}"`);
       }
     }
   }, [keys, namespace]);
@@ -93,7 +93,7 @@ export const Render = (props) => {
     ...defaultViewContext,
     namespace,
     template: props.element ? context.template : null,
-    proxies: spec,
+    plugs,
     used: used.current,
     parent: context,
   };
@@ -110,10 +110,8 @@ export const Hatch = (props) => {
   const key = `${context.namespace}.${props.sock}`;
   const template = props.children; // single
 
-  const proxies = findProxies(context, props.sock);
-
-  const rendered = proxies
-    ?.map((item) => renderProxy(item, template))
+  const rendered = findPlugs(context, props.sock)
+    .map((item) => renderPlug(item, template))
     .filter(Boolean);
 
   const childContext = {
@@ -126,68 +124,89 @@ export const Hatch = (props) => {
 
   return (
     <ViewContext.Provider value={childContext}>
-      {rendered?.length === 1 ? rendered[0] : rendered || template}
+      {rendered.length === 1
+        ? rendered[0]
+        : rendered.length > 1
+        ? rendered
+        : template}
     </ViewContext.Provider>
   );
 };
 
-export const Proxy = () => {
-  throw new ProxyError("<Proxy> can only be used in <Render>");
+export const Plug = () => {
+  throw new RenderError("<Plug> can only be used in <Render>");
 };
 
-function transformProxy(proxy, ns) {
-  if (!React.isValidElement(proxy) || proxy.type !== Proxy) {
-    throw new ProxyError(`${ns}: <Render> can only contain <Proxy>`);
+export const Swap = () => {
+  throw new RenderError("<Swap> can only be used in <Render>");
+};
+
+export const Proxy = () => {
+  throw new RenderError("<Proxy> can only be used in <Render>");
+};
+
+function transformPlug(plug, ns) {
+  if (
+    !React.isValidElement(plug) ||
+    (plug.type !== Plug && plug.type !== Swap && plug.type !== Proxy)
+  ) {
+    throw new RenderError(`${ns}: <Render> can only contain <Plug|Swap|Proxy>`);
   }
 
   const item = {
-    ...proxy.props,
-    sock: resolveSock(proxy.props.sock),
-    content: proxy.props.children,
-    key: proxy.key,
+    mode: plug.type.name.toLowerCase(),
+    sock: resolveSock(plug.props.sock),
+    content: plug.props.children,
+    key: plug.key,
   };
+
   if (!item.sock) {
-    throw new ProxyError(`${ns}: missing sock= on <Proxy>`);
+    throw new RenderError(`${ns}: missing sock= on <${plug.type.name}>`);
   }
 
-  const p = `<Proxy sock="${item.sock}">`;
+  const p = `<${plug.type.name} sock="${item.sock}">`;
   item.sock = relativeSock(item.sock, ns) || relativeSock(item.sock, "");
   if (!item.sock) {
-    throw new ProxyError(`${p} is not valid in "${ns}" namespace`);
+    throw new RenderError(`${p} is not valid in "${ns}" namespace`);
   }
 
-  if (["string", "number"].includes(typeof item.text)) {
-    item.content = item.text;
-  } else if (item.text) {
-    throw new ProxyError(`text= on ${p} must be a string or a number`);
+  if (item.mode !== "proxy") {
+    // plug|swap
+    const text = plug.props.text;
+    if (["string", "number"].includes(typeof text)) {
+      item.content = text;
+    } else if (text) {
+      throw new RenderError(`text= on ${p} must be a string or a number`);
+    }
   }
 
-  if (React.isValidElement(item.element)) {
-    item.content = item.element;
-  } else if (item.element) {
-    throw new ProxyError(`element= on ${p} must be an element`);
+  const element = plug.props.element;
+  if (React.isValidElement(element)) {
+    item.content = element;
+  } else if (element) {
+    throw new RenderError(`element= on ${p} must be an element`);
   }
 
   if (
-    item.merge &&
+    item.mode === "proxy" &&
     item.content != null && // coerces undefined
     !React.isValidElement(item.content)
   ) {
-    throw new Error(`${p} merge mode requires a single child element or null`);
+    throw new Error(`${p} requires a single child element or null`);
   }
 
   return item;
 }
 
-function findProxies(context, sock) {
+function findPlugs(context, sock) {
   while (context) {
-    if (context.proxies) {
-      const proxies = context.proxies[sock];
-      if (proxies) {
+    if (context.plugs) {
+      const plugs = context.plugs[sock];
+      if (plugs) {
         if (context.used) {
           context.used[sock] = true;
         }
-        return proxies;
+        return plugs;
       }
     }
     if (context.hatch) {
@@ -195,26 +214,28 @@ function findProxies(context, sock) {
     }
     context = context.parent;
   }
-  return null;
+  return [];
 }
 
-function renderProxy(item, template) {
-  const proxy = item.content;
-
-  if (item.replace) {
-    // replace everything with the proxy
-    return proxy;
-  } else if (!item.merge) {
-    // place proxy inside template element
+function renderPlug(item, template) {
+  if (item.mode === "plug") {
+    // place plug content inside template element
     return (
       <template.type
         {...mergeProps(template.props, item.key ? { key: item.key } : null, {
-          children: proxy,
+          children: item.content,
         })}
       />
     );
-  } else if (React.isValidElement(proxy)) {
+  } else if (item.mode === "swap") {
+    // replace everything with the plug content
+    return item.content;
+  } else if (item.mode !== "proxy") {
+    // should never get here
+    throw "plug mode error";
+  } else if (React.isValidElement(item.content)) {
     // merge proxy element with template element
+    const proxy = item.content;
     return (
       <proxy.type
         {...mergeProps(
