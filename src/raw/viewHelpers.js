@@ -111,7 +111,7 @@ export const Hatch = (props) => {
   const template = props.children; // single
 
   const rendered = findPlugs(context, props.sock)
-    .map((item) => renderPlug(item, template))
+    ?.map((item) => renderPlug(item, template))
     .filter(Boolean);
 
   const childContext = {
@@ -124,11 +124,7 @@ export const Hatch = (props) => {
 
   return (
     <ViewContext.Provider value={childContext}>
-      {rendered.length === 1
-        ? rendered[0]
-        : rendered.length > 1
-        ? rendered
-        : template}
+      {rendered?.length === 1 ? rendered[0] : rendered || template}
     </ViewContext.Provider>
   );
 };
@@ -214,7 +210,7 @@ function findPlugs(context, sock) {
     }
     context = context.parent;
   }
-  return [];
+  return null;
 }
 
 function renderPlug(item, template) {
