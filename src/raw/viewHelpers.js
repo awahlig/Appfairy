@@ -29,6 +29,7 @@ export const View = ({
   content,
   scripts,
   styles,
+  wfData,
   fallback,
   children,
 }) => {
@@ -39,6 +40,21 @@ export const View = ({
       setLoaded(true);
     });
   }, [scripts, styles]);
+
+  React.useLayoutEffect(() => {
+    const htmlEl = document.querySelector("html");
+    // Save and later restore previous values in case the view is a popup.
+    const prevData = {};
+    for (const [attr, value] of Object.entries(wfData)) {
+      prevData[attr] = htmlEl.dataset[attr];
+      htmlEl.dataset[attr] = value;
+    }
+    return () => {
+      for (const [attr, value] of Object.entries(prevData)) {
+        htmlEl.dataset[attr] = value;
+      }
+    };
+  }, [wfData]);
 
   React.useLayoutEffect(() => {
     const Webflow = window.Webflow;

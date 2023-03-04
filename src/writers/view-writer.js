@@ -443,7 +443,6 @@ class ViewWriter extends Writer {
 
   _compose() {
     return freeLint(`
-      import { useEffect } from "react";
       import { View, Hatch, defineSock } from "${this[_].importPath(
         "./helpers"
       )}";
@@ -458,12 +457,13 @@ class ViewWriter extends Writer {
     const args = [
       `namespace={${this.sockName}}`,
       "content={props.children}",
-      "fallback={props.fallback}",
       "scripts={scripts}",
       "styles={styles}",
+      "wfData={wfData}",
+      "{...props}",
     ];
 
-    const render = freeText(`
+    const body = freeText(`
       return (
         <View ${args.join(" ")}>
           ==>${this.jsx}<==
@@ -471,19 +471,18 @@ class ViewWriter extends Writer {
       );
     `);
 
-    const socks = this[_].composeSocks();
-    const scripts = this[_].composeScripts();
-    const styles = this[_].composeStyles();
-
-    const body = [this[_].composeEffects(), render].filter(Boolean);
-
-    const decl = [socks, scripts, styles].filter(Boolean);
+    const decl = [
+      this[_].composeSocks(),
+      this[_].composeScripts(),
+      this[_].composeStyles(),
+      this[_].composeWfData(),
+    ].filter(Boolean);
 
     return freeText(`
       ==>${decl.join("\n\n")}<==
 
       ${prefix}${viewName} = (props) => {
-        ==>${body.join("\n\n")}<==
+        ==>${body}<==
       };
     `);
   }
@@ -522,18 +521,6 @@ class ViewWriter extends Writer {
       export const ${this.sockName} = defineSock("${this.sockNamespace}", {
         ==>${collect(this[_].sockets, this.sockName)}<==
       })
-    `);
-  }
-
-  _composeEffects() {
-    const content = [this[_].composeWfDataAttrs()].filter(Boolean);
-
-    if (content.length === 0) return "";
-
-    return freeText(`
-      useEffect(() => {
-        ==>${content.join("\n\n")}<==
-      }, []);
     `);
   }
 
@@ -587,18 +574,16 @@ class ViewWriter extends Writer {
     `);
   }
 
-  _composeWfDataAttrs() {
-    if (!this[_].wfData.size) {
-      return "";
-    }
+  _composeWfData() {
+    const content = Array.from(this[_].wfData).map(
+      ([attr, value]) => `${attr}: "${value}",`
+    );
 
-    const lines = ['const htmlEl = document.querySelector("html");'];
-
-    for (let [attr, value] of this[_].wfData) {
-      lines.push(`htmlEl.dataset["${attr}"] = "${value}";`);
-    }
-
-    return lines.join("\n");
+    return freeText(`
+      export const wfData = Object.freeze({
+        ==>${content.join("\n")}<==
+      });
+    `);
   }
 
   _importPath(name) {
