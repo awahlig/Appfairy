@@ -24,15 +24,7 @@ const defaultViewContext = Object.freeze({
 
 const ViewContext = React.createContext(defaultViewContext);
 
-export const View = ({
-  namespace,
-  content,
-  scripts,
-  styles,
-  wfData,
-  fallback,
-  children,
-}) => {
+export const View = ({ scripts, styles, wfData, noWebflow, ...props }) => {
   const [loaded, setLoaded] = React.useState(false);
 
   React.useEffect(() => {
@@ -58,22 +50,22 @@ export const View = ({
 
   React.useLayoutEffect(() => {
     const Webflow = window.Webflow;
-    if (Webflow && loaded) {
+    if (!noWebflow && Webflow && loaded) {
       Webflow.ready();
       Webflow.require("ix2")?.init();
     }
-  }, [loaded]);
+  }, [loaded, noWebflow]);
 
   const context = {
     ...defaultViewContext,
-    namespace: resolveSock(namespace),
-    template: children,
+    namespace: resolveSock(props.namespace),
+    template: props.children,
   };
 
   return loaded ? (
-    <ViewContext.Provider value={context}>{content}</ViewContext.Provider>
+    <ViewContext.Provider value={context}>{props.content}</ViewContext.Provider>
   ) : (
-    <>{fallback}</>
+    <>{props.fallback}</>
   );
 };
 
