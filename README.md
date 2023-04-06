@@ -2,7 +2,7 @@ Changes made in this fork:
 
 - Takes a zip file as input (no need to unzip manually)
 - Render in multiple stages using React components
-- Flexible view API removing the need for `af-view`
+- Flexible view API removing the need for `af-el`
 - More reliable migration files tracking using a state file instead of git directly
 - Support for page folders
 - Support for TypeScript
