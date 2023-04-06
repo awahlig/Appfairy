@@ -1,12 +1,12 @@
 Changes made in this fork:
 
 - Takes a zip file as input (no need to unzip manually)
-- Doesn't use git to find migration files
 - Render in multiple stages using React components
-- Support for the `af-shape` attribute
+- Flexible view API removing the need for `af-view`
+- More reliable migration files tracking using a state file instead of git directly
 - Support for page folders
 - Support for TypeScript
-- Uses function components and React hooks
+- Uses function components instead of class components
 - Encapsulation of CSS disabled by default
 - Bugfixes
 
