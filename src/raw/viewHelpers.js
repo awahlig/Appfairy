@@ -158,23 +158,23 @@ function transformPlug(plug, ns) {
   }
 
   const item = {
-    mode: plug.type.name.toLowerCase(),
+    type: plug.type,
     sock: resolveSock(plug.props.sock),
     content: plug.props.children,
     key: plug.key,
   };
 
   if (!item.sock) {
-    throw new RenderError(`${ns}: missing sock= on <${plug.type.name}>`);
+    throw new RenderError(`${ns}: missing sock= on <${item.type.name}>`);
   }
 
-  const p = `<${plug.type.name} sock="${item.sock}">`;
+  const p = `<${item.type.name} sock="${item.sock}">`;
   item.sock = relativeSock(item.sock, ns) || relativeSock(item.sock, "");
   if (!item.sock) {
     throw new RenderError(`${p} is not valid in "${ns}" namespace`);
   }
 
-  if (item.mode !== "proxy") {
+  if (item.type !== Proxy) {
     // plug|swap
     const text = plug.props.text;
     if (["string", "number"].includes(typeof text)) {
@@ -192,7 +192,7 @@ function transformPlug(plug, ns) {
   }
 
   if (
-    item.mode === "proxy" &&
+    item.type === Proxy &&
     item.content != null && // coerces undefined
     !React.isValidElement(item.content)
   ) {
@@ -222,7 +222,7 @@ function findPlugs(context, sock) {
 }
 
 function renderPlug(item, template) {
-  if (item.mode === "plug") {
+  if (item.type === Plug) {
     // place plug content inside template element
     return (
       <template.type
@@ -231,12 +231,12 @@ function renderPlug(item, template) {
         })}
       />
     );
-  } else if (item.mode === "swap") {
+  } else if (item.type === Swap) {
     // replace everything with the plug content
     return item.content;
-  } else if (item.mode !== "proxy") {
+  } else if (item.type !== Proxy) {
     // should never get here
-    throw "plug mode error";
+    throw "invalid plug type";
   } else if (React.isValidElement(item.content)) {
     // merge proxy element with template element
     const proxy = item.content;
