@@ -1,6 +1,6 @@
 {
   "name": "@awahlig/appfairy",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "A CLI tool to Migrate a Webflow project into a React app",
   "homepage": "https://github.com/awahlig/Appfairy#readme",
   "license": "MIT",
